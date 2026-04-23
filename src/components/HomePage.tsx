@@ -12,6 +12,9 @@ const CATEGORIES = [
   { icon: "🧬", label: "Биотехнологии", key: "Биотехнологии" },
   { icon: "💊", label: "Нутрицевтика", key: "Нутрицевтика" },
   { icon: "🌿", label: "Детокс", key: "Детокс" },
+  { icon: "💻", label: "Компьютеры", key: "Компьютеры" },
+  { icon: "👟", label: "Одежда и обувь", key: "Одежда и обувь" },
+  { icon: "🔧", label: "Услуги", key: "Услуги" },
   { icon: "🎖️", label: "Ветеранам", key: "Ветеранам" },
 ];
 
@@ -70,7 +73,7 @@ export default function HomePage({ setPage, products, addToCart }: Props) {
       <section className="py-10 px-4 bg-white border-b border-border">
         <div className="container mx-auto">
           <h2 className="text-xl font-black mb-6 text-foreground" style={{ fontFamily: "Montserrat, sans-serif" }}>Категории</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-3">
             {CATEGORIES.map((cat) => (
               <button
                 key={cat.key}

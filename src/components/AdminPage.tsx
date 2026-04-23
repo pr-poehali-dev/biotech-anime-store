@@ -18,7 +18,7 @@ const EMPTY: Omit<Product, "id"> = {
   badge: "",
 };
 
-const CATEGORIES = ["Биотехнологии", "Нутрицевтика", "Детокс", "Ветеранам"];
+const CATEGORIES = ["Биотехнологии", "Нутрицевтика", "Детокс", "Компьютеры", "Одежда и обувь", "Услуги", "Ветеранам"];
 
 export default function AdminPage({ products, setProducts }: Props) {
   const [password, setPassword] = useState("");

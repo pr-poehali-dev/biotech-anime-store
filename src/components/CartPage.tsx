@@ -1,5 +1,8 @@
+import { useState } from "react";
 import Icon from "@/components/ui/icon";
 import type { CartItem, Page } from "@/App";
+
+const PAYMENT_URL = "https://functions.poehali.dev/c32d0a92-5be1-4706-a6f2-802136bbceb1";
 
 type Props = {
   cart: CartItem[];
@@ -9,16 +12,46 @@ type Props = {
 };
 
 export default function CartPage({ cart, removeFromCart, updateQty, setPage }: Props) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
   const total = cart.reduce((s, i) => s + i.price * i.qty, 0);
   const hasVet = cart.some((i) => i.isVeteran);
 
-  const handleTBankPay = () => {
-    const url = `https://securepay.tinkoff.ru/v2/Init`;
-    window.open(
-      "https://www.tbank.ru/payments/",
-      "_blank",
-      "noopener,noreferrer"
-    );
+  const handleTBankPay = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const orderId = `order-${Date.now()}`;
+      const res = await fetch(PAYMENT_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          cart: cart.map((i) => ({
+            name: i.name,
+            price: i.price,
+            qty: i.qty,
+            isVeteran: i.isVeteran ?? false,
+          })),
+          orderId,
+          successUrl: window.location.href + "?payment=success",
+          failUrl: window.location.href + "?payment=fail",
+        }),
+      });
+      const data = await res.json();
+      if (data.free) {
+        alert("🎖️ " + data.message);
+        return;
+      }
+      if (data.paymentUrl) {
+        window.location.href = data.paymentUrl;
+      } else {
+        setError(data.error || "Ошибка при создании платежа");
+      }
+    } catch {
+      setError("Не удалось подключиться к платёжному сервису");
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (cart.length === 0) {
@@ -109,11 +142,27 @@ export default function CartPage({ cart, removeFromCart, updateQty, setPage }: P
 
             <button
               onClick={handleTBankPay}
-              className="bear-btn w-full bg-yellow-400 hover:bg-yellow-500 text-gray-900 font-black py-3 rounded-2xl flex items-center justify-center gap-2 mb-3 text-base"
+              disabled={loading}
+              className="bear-btn w-full bg-yellow-400 hover:bg-yellow-500 disabled:opacity-60 disabled:cursor-not-allowed text-gray-900 font-black py-3 rounded-2xl flex items-center justify-center gap-2 mb-3 text-base"
             >
-              <span className="text-xl">🏦</span>
-              Оплатить через Т-Банк
+              {loading ? (
+                <>
+                  <Icon name="Loader2" size={20} className="animate-spin" />
+                  Создаём платёж...
+                </>
+              ) : (
+                <>
+                  <span className="text-xl">🏦</span>
+                  Оплатить через Т-Банк
+                </>
+              )}
             </button>
+
+            {error && (
+              <div className="bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl px-3 py-2 mb-3">
+                {error}
+              </div>
+            )}
 
             <p className="text-xs text-muted-foreground text-center">
               Безопасная оплата через Т-Банк (Тинькофф). SSL-шифрование.

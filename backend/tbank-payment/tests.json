@@ -1,0 +1,27 @@
+{
+  "tests": [
+    {
+      "name": "OPTIONS preflight",
+      "method": "OPTIONS",
+      "path": "/",
+      "expectedStatus": 200
+    },
+    {
+      "name": "Empty cart",
+      "method": "POST",
+      "path": "/",
+      "body": {"cart": [], "orderId": "test-001"},
+      "expectedStatus": 400
+    },
+    {
+      "name": "Veteran only cart (free)",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "cart": [{"name": "Ветеранский набор", "price": 0, "qty": 1, "isVeteran": true}],
+        "orderId": "test-002"
+      },
+      "expectedStatus": 200
+    }
+  ]
+}

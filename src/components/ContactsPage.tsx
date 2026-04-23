@@ -1,13 +1,40 @@
 import { useState } from "react";
 import Icon from "@/components/ui/icon";
 
+const EMAIL_URL = "https://functions.poehali.dev/96724469-2c55-4fdb-8962-080fa1f53e80";
+
 export default function ContactsPage() {
   const [sent, setSent] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
   const [form, setForm] = useState({ name: "", phone: "", message: "" });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSent(true);
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch(EMAIL_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          formType: "Вопрос с сайта",
+          name: form.name,
+          phone: form.phone,
+          comment: form.message,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setSent(true);
+      } else {
+        setError(data.error || "Ошибка отправки");
+      }
+    } catch {
+      setError("Не удалось отправить. Напишите напрямую на ZVERONG@yandex.ru");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -56,8 +83,11 @@ export default function ContactsPage() {
               <label className="text-xs font-semibold text-muted-foreground mb-1 block">Сообщение</label>
               <textarea required rows={4} className="w-full border border-border rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/30 resize-none" value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} placeholder="Ваш вопрос..." />
             </div>
-            <button type="submit" className="bear-btn w-full bg-primary text-primary-foreground font-bold py-3 rounded-2xl">
-              Отправить
+            {error && (
+              <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-4 py-3">{error}</div>
+            )}
+            <button type="submit" disabled={loading} className="bear-btn w-full bg-primary text-primary-foreground font-bold py-3 rounded-2xl flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed">
+              {loading ? <><Icon name="Loader2" size={18} className="animate-spin" />Отправляем...</> : "Отправить"}
             </button>
           </form>
         )}

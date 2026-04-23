@@ -95,14 +95,36 @@ const BUSINESS_PLANS = [
   },
 ];
 
+const EMAIL_URL = "https://functions.poehali.dev/96724469-2c55-4fdb-8962-080fa1f53e80";
+
 export default function ServicesPage({ setPage }: Props) {
   const [form, setForm] = useState({ name: "", company: "", phone: "", email: "", plan: "", comment: "" });
   const [sent, setSent] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState<"personal" | "business">("personal");
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSent(true);
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch(EMAIL_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ formType: form.plan || "Заявка с сайта", ...form }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setSent(true);
+      } else {
+        setError(data.error || "Ошибка отправки");
+      }
+    } catch {
+      setError("Не удалось отправить заявку. Позвоните нам напрямую.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const selectPlan = (planName: string) => {
@@ -320,9 +342,13 @@ export default function ServicesPage({ setPage }: Props) {
                 <label className="text-xs font-semibold text-muted-foreground mb-1 block">Комментарий</label>
                 <textarea rows={3} className="w-full border border-border rounded-xl px-4 py-2.5 text-sm bg-white outline-none focus:ring-2 focus:ring-primary/30 resize-none" value={form.comment} onChange={(e) => setForm({ ...form, comment: e.target.value })} placeholder="Опишите задачу или вопрос..." />
               </div>
-              <button type="submit" className="bear-btn w-full bg-primary text-primary-foreground font-black py-3 rounded-2xl text-base flex items-center justify-center gap-2">
-                <Icon name="Send" size={18} />
-                Отправить заявку
+              {error && (
+                <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-4 py-3">
+                  {error}
+                </div>
+              )}
+              <button type="submit" disabled={loading} className="bear-btn w-full bg-primary text-primary-foreground font-black py-3 rounded-2xl text-base flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed">
+                {loading ? <><Icon name="Loader2" size={18} className="animate-spin" />Отправляем...</> : <><Icon name="Send" size={18} />Отправить заявку</>}
               </button>
               <p className="text-xs text-muted-foreground text-center">Нажимая кнопку, вы соглашаетесь с обработкой персональных данных</p>
             </form>

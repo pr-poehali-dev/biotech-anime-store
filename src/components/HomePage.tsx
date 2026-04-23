@@ -77,10 +77,12 @@ export default function HomePage({ setPage, products, addToCart }: Props) {
             {CATEGORIES.map((cat) => (
               <button
                 key={cat.key}
-                onClick={() => cat.key === "Ветеранам" ? setPage("veterans") : setPage("catalog")}
+                onClick={() => cat.key === "Ветеранам" ? setPage("veterans") : cat.key === "Услуги" ? setPage("services") : setPage("catalog")}
                 className={`bear-btn flex flex-col items-center justify-center gap-2 p-5 rounded-2xl border-2 font-semibold text-sm transition-all ${
                   cat.key === "Ветеранам"
                     ? "border-red-300 bg-red-50 text-red-700 hover:bg-red-100"
+                    : cat.key === "Услуги"
+                    ? "border-orange-300 bg-orange-50 text-orange-700 hover:bg-orange-100"
                     : "border-border bg-background hover:border-primary hover:bg-blue-50 text-foreground"
                 }`}
               >

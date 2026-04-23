@@ -9,8 +9,9 @@ import CartPage from "@/components/CartPage";
 import AdminPage from "@/components/AdminPage";
 import DeliveryPage from "@/components/DeliveryPage";
 import ContactsPage from "@/components/ContactsPage";
+import ServicesPage from "@/components/ServicesPage";
 
-export type Page = "home" | "catalog" | "veterans" | "cart" | "admin" | "delivery" | "contacts";
+export type Page = "home" | "catalog" | "veterans" | "cart" | "admin" | "delivery" | "contacts" | "services";
 
 export type Product = {
   id: number;
@@ -273,6 +274,7 @@ export default function App() {
       case "admin": return <AdminPage products={products} setProducts={setProducts} />;
       case "delivery": return <DeliveryPage />;
       case "contacts": return <ContactsPage />;
+      case "services": return <ServicesPage setPage={setPage} />;
       default: return null;
     }
   };

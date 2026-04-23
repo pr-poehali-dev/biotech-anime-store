@@ -11,6 +11,7 @@ type HeaderProps = {
 const NAV = [
   { id: "home", label: "Главная" },
   { id: "catalog", label: "Каталог" },
+  { id: "services", label: "Услуги" },
   { id: "veterans", label: "Ветеранам СВО" },
   { id: "delivery", label: "Доставка и оплата" },
   { id: "contacts", label: "Контакты" },

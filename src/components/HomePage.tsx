@@ -129,6 +129,72 @@ export default function HomePage({ setPage, products, addToCart }: Props) {
         </div>
       </section>
 
+      {/* SERVICES PROMO */}
+      <section className="py-12 px-4 bg-gradient-to-br from-slate-50 to-blue-50 border-t border-border">
+        <div className="container mx-auto">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-8 gap-3">
+            <div>
+              <div className="text-xs font-bold tracking-widest text-primary uppercase mb-1">Профессиональный сервис</div>
+              <h2 className="text-2xl font-black text-foreground" style={{ fontFamily: "Montserrat, sans-serif" }}>
+                Услуги профессионалов
+              </h2>
+              <p className="text-muted-foreground text-sm mt-1">Ремонт ПК, установка ПО, техническое обслуживание</p>
+            </div>
+            <button
+              onClick={() => setPage("services")}
+              className="bear-btn flex items-center gap-2 bg-primary text-primary-foreground font-bold px-5 py-2.5 rounded-xl text-sm shrink-0"
+            >
+              Все услуги <Icon name="ChevronRight" size={16} />
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {[
+              { icon: "🔍", name: "Диагностика ПК / ноутбука",   price: "500 ₽",      time: "1–2 часа" },
+              { icon: "⚙️", name: "Установка Windows 10 / 11",   price: "1 200 ₽",    time: "2–3 часа" },
+              { icon: "🧹", name: "Чистка от пыли + термопаста", price: "800 ₽",      time: "1 час"    },
+              { icon: "🔑", name: "Удаление вирусов и рекламы",  price: "1 000 ₽",    time: "2 часа"   },
+              { icon: "🖥️", name: "Замена матрицы ноутбука",     price: "от 2 500 ₽", time: "1–3 часа" },
+              { icon: "📦", name: "Перенос данных / резервная копия", price: "700 ₽", time: "1–3 часа" },
+            ].map((s) => (
+              <button
+                key={s.name}
+                onClick={() => setPage("services")}
+                className="bear-btn text-left bg-white border border-border rounded-2xl p-5 hover:border-primary hover:shadow-md transition-all group"
+              >
+                <div className="flex items-start gap-3">
+                  <span className="text-3xl">{s.icon}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-bold text-sm text-foreground leading-snug mb-1 group-hover:text-primary transition-colors">
+                      {s.name}
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-primary font-black text-sm">{s.price}</span>
+                      <span className="text-muted-foreground text-xs">· {s.time}</span>
+                    </div>
+                  </div>
+                  <Icon name="ChevronRight" size={16} className="text-muted-foreground group-hover:text-primary mt-1 shrink-0 transition-colors" />
+                </div>
+              </button>
+            ))}
+          </div>
+
+          {/* CTA полоска */}
+          <div className="mt-6 bg-primary/5 border border-primary/20 rounded-2xl px-6 py-4 flex flex-col sm:flex-row items-center gap-4 justify-between">
+            <div className="text-center sm:text-left">
+              <p className="font-bold text-foreground text-sm">Нужен выезд специалиста?</p>
+              <p className="text-muted-foreground text-xs mt-0.5">Работаем по всей России · Гарантия на все работы</p>
+            </div>
+            <button
+              onClick={() => setPage("contacts")}
+              className="bear-btn bg-primary text-primary-foreground font-bold px-5 py-2.5 rounded-xl text-sm shrink-0"
+            >
+              📞 Связаться
+            </button>
+          </div>
+        </div>
+      </section>
+
       {/* USP ROW */}
       <section className="py-10 px-4 bg-white border-t border-border">
         <div className="container mx-auto grid grid-cols-2 md:grid-cols-4 gap-6 text-center">

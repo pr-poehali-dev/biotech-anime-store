@@ -54,9 +54,9 @@ export default function Header({ page, setPage, cartCount }: HeaderProps) {
             </div>
             <div className="hidden sm:block">
               <div className="font-black text-sm leading-tight text-foreground" style={{ fontFamily: "Montserrat, sans-serif" }}>
-                МТМ Маркет Мишка
+                Товары, Услуги, Ветеранам, Игры
               </div>
-              <div className="text-xs text-muted-foreground leading-tight">Услуги профессионалов</div>
+              <div className="text-xs text-muted-foreground leading-tight">МТМ Маркет Мишка</div>
             </div>
           </button>
 

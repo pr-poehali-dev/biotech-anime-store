@@ -8,6 +8,7 @@ import BasePanel from './game2/BasePanel';
 import ArmyPanel from './game2/ArmyPanel';
 import CombatPanel from './game2/CombatPanel';
 import AlliancePanel from './game2/AlliancePanel';
+import ChatPanel from './game2/ChatPanel';
 import GameShop from './game2/GameShop';
 import type { Player } from './game2/usePlayer';
 
@@ -17,8 +18,20 @@ export default function Game2Page() {
   const { player, setPlayer, loading, refresh } = usePlayer();
   const [tab, setTab] = useState<Tab>('map');
   const [showShop, setShowShop] = useState(false);
-  const [bases, setBases] = useState<Array<{ id: number; name: string; level: number; is_deployed: boolean; pos_x: number; pos_y: number; hp: number; max_hp: number; commander_level: number; commander_implants: Record<string, number>; defenses: Record<string, unknown>; production_queue: unknown[]; planet_id: number | null }>>([]);
-  const [units, setUnits] = useState<Array<{ id: number; type: string; specialization: string; level: number; implants: string[]; weapon: string; hp: number; max_hp: number; attack: number; defense: number; is_alive: boolean; base_id: number | null; planet_id: number | null }>>([]);
+  const [showChat, setShowChat] = useState(false);
+  const [bases, setBases] = useState<Array<{
+    id: number; name: string; level: number; is_deployed: boolean;
+    pos_x: number; pos_y: number; hp: number; max_hp: number;
+    commander_level: number; commander_implants: Record<string, number>;
+    defenses: Record<string, unknown>; production_queue: unknown[];
+    planet_id: number | null;
+  }>>([]);
+  const [units, setUnits] = useState<Array<{
+    id: number; type: string; specialization: string; level: number;
+    implants: string[]; weapon: string; hp: number; max_hp: number;
+    attack: number; defense: number; is_alive: boolean;
+    base_id: number | null; planet_id: number | null;
+  }>>([]);
 
   const loadGameData = useCallback(async () => {
     const [b, u] = await Promise.all([apiBases(), apiUnits()]);
@@ -69,15 +82,15 @@ export default function Game2Page() {
   }
 
   const TABS: Array<{ id: Tab; label: string; emoji: string }> = [
-    { id: 'map', label: 'Карта', emoji: '🌌' },
-    { id: 'base', label: 'База', emoji: '🏭' },
-    { id: 'army', label: 'Армия', emoji: '⚔️' },
-    { id: 'combat', label: 'Бой', emoji: '💥' },
+    { id: 'map',      label: 'Карта',  emoji: '🌌' },
+    { id: 'base',     label: 'База',   emoji: '🏭' },
+    { id: 'army',     label: 'Армия',  emoji: '⚔️' },
+    { id: 'combat',   label: 'Бой',    emoji: '💥' },
     { id: 'alliance', label: 'Альянс', emoji: '🏰' },
   ];
 
   return (
-    <div className="min-h-screen bg-slate-950 flex flex-col">
+    <div className="min-h-screen bg-slate-950 flex flex-col relative">
       <PlayerHUD player={player} onShop={() => setShowShop(true)} onLogout={handleLogout} />
 
       {/* Tab navigation */}
@@ -85,7 +98,8 @@ export default function Game2Page() {
         <div className="flex gap-1 max-w-lg">
           {TABS.map(t => (
             <button key={t.id} onClick={() => setTab(t.id)}
-              className={`flex-1 py-2 rounded-xl text-xs font-bold transition-colors ${tab === t.id ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}`}>
+              className={`flex-1 py-2 rounded-xl text-xs font-bold transition-colors
+                ${tab === t.id ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}`}>
               <span className="block text-base leading-tight">{t.emoji}</span>
               <span>{t.label}</span>
             </button>
@@ -93,14 +107,11 @@ export default function Game2Page() {
         </div>
       </div>
 
-      {/* Content */}
+      {/* Main content */}
       <div className="flex-1 overflow-hidden">
         {tab === 'map' && (
           <div className="h-full" style={{ minHeight: 'calc(100vh - 120px)' }}>
-            <GalaxyMap
-              currentPlanetId={player.planet_id}
-              onSelectPlanet={handleLandPlanet}
-            />
+            <GalaxyMap currentPlanetId={player.planet_id} onSelectPlanet={handleLandPlanet} />
           </div>
         )}
 
@@ -126,6 +137,35 @@ export default function Game2Page() {
           </div>
         )}
       </div>
+
+      {/* ── Floating Chat ─────────────────────────────────────────────── */}
+      {/* Toggle button */}
+      <button
+        onClick={() => setShowChat(c => !c)}
+        className={`fixed bottom-5 right-5 z-40 w-13 h-13 rounded-2xl shadow-2xl flex items-center justify-center transition-all duration-200
+          ${showChat
+            ? 'bg-slate-700 hover:bg-slate-600 scale-95'
+            : 'bg-blue-600 hover:bg-blue-500 hover:scale-105'
+          }`}
+        style={{ width: 52, height: 52 }}
+        title="Открыть чат"
+      >
+        {showChat ? (
+          <svg viewBox="0 0 24 24" className="w-5 h-5 fill-white"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        ) : (
+          <span className="text-xl">💬</span>
+        )}
+      </button>
+
+      {/* Chat window */}
+      {showChat && (
+        <div
+          className="fixed bottom-20 right-5 z-40 w-80 md:w-96 shadow-2xl rounded-2xl overflow-hidden"
+          style={{ height: '60vh', maxHeight: 520, minHeight: 320 }}
+        >
+          <ChatPanel player={player} />
+        </div>
+      )}
 
       {showShop && <GameShop onClose={() => setShowShop(false)} />}
     </div>

@@ -76,6 +76,45 @@ export async function apiLeaderboard() {
   return parsed.leaderboard || [];
 }
 
+// ── Чат ────────────────────────────────────────────────────────────────────
+
+export async function apiChatGlobal(since = 0) {
+  const r = await fetch(`${STATE_URL}?action=chat_global&since=${since}`);
+  const json = await r.json();
+  const parsed = typeof json === 'string' ? JSON.parse(json) : json;
+  return (parsed.messages || []) as ChatMessage[];
+}
+
+export async function apiChatAlliance(allianceId: number, since = 0) {
+  const r = await fetch(`${STATE_URL}?action=chat_alliance&alliance_id=${allianceId}&since=${since}`, { headers: authHeaders() });
+  const json = await r.json();
+  const parsed = typeof json === 'string' ? JSON.parse(json) : json;
+  return (parsed.messages || []) as ChatMessage[];
+}
+
+export async function apiChatSend(message: string, channel: 'global' | 'alliance') {
+  const r = await fetch(STATE_URL, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ action: 'chat_send', message, channel }),
+  });
+  const json = await r.json();
+  const parsed = typeof json === 'string' ? JSON.parse(json) : json;
+  if (!r.ok) throw new Error(parsed.error || 'Ошибка отправки');
+  return parsed.message as ChatMessage;
+}
+
+export type ChatMessage = {
+  id: number;
+  player_id: number;
+  nickname: string;
+  faction: string;
+  faction_emoji: string;
+  message: string;
+  msg_type: string;
+  created_at: string;
+};
+
 export async function apiAction(action: string, body: Record<string, unknown>) {
   const r = await fetch(ACTION_URL, {
     method: 'POST',

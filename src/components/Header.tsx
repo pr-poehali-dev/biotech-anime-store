@@ -13,6 +13,7 @@ const NAV = [
   { id: "catalog", label: "Каталог" },
   { id: "services", label: "Услуги" },
   { id: "game", label: "🎮 Игра" },
+  { id: "game2", label: "🌌 Эпоха Звёзд" },
   { id: "veterans", label: "Ветеранам СВО" },
   { id: "delivery", label: "Доставка и оплата" },
   { id: "contacts", label: "Контакты" },

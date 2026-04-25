@@ -1,0 +1,22 @@
+{
+  "tests": [
+    {
+      "name": "Register player",
+      "method": "POST",
+      "path": "/",
+      "body": {"action": "register", "email": "test@game.com", "nickname": "TestHero", "login": "testhero", "password": "pass123", "faction": "human"},
+      "expectedStatus": 200,
+      "expectedBody": {"token": "string"},
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Login player",
+      "method": "POST",
+      "path": "/",
+      "body": {"action": "login", "login": "testhero", "password": "pass123"},
+      "expectedStatus": 200,
+      "expectedBody": {"token": "string"},
+      "bodyMatcher": "partial"
+    }
+  ]
+}

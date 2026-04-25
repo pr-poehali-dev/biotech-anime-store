@@ -1,0 +1,13 @@
+{
+  "tests": [
+    {
+      "name": "Action no auth",
+      "method": "POST",
+      "path": "/",
+      "body": {"target_type": "monster"},
+      "expectedStatus": 401,
+      "expectedBody": {"error": "string"},
+      "bodyMatcher": "partial"
+    }
+  ]
+}

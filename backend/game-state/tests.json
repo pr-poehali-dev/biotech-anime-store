@@ -1,0 +1,12 @@
+{
+  "tests": [
+    {
+      "name": "Get planets list",
+      "method": "GET",
+      "path": "/",
+      "expectedStatus": 200,
+      "expectedBody": {"planets": []},
+      "bodyMatcher": "partial"
+    }
+  ]
+}

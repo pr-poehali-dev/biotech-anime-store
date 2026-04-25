@@ -11,8 +11,9 @@ import DeliveryPage from "@/components/DeliveryPage";
 import ContactsPage from "@/components/ContactsPage";
 import ServicesPage from "@/components/ServicesPage";
 import GamePage from "@/components/GamePage";
+import Game2Page from "@/components/Game2Page";
 
-export type Page = "home" | "catalog" | "veterans" | "cart" | "admin" | "delivery" | "contacts" | "services" | "game";
+export type Page = "home" | "catalog" | "veterans" | "cart" | "admin" | "delivery" | "contacts" | "services" | "game" | "game2";
 
 export type Product = {
   id: number;
@@ -277,6 +278,7 @@ export default function App() {
       case "contacts": return <ContactsPage />;
       case "services": return <ServicesPage setPage={setPage} />;
       case "game": return <GamePage />;
+      case "game2": return <Game2Page />;
       default: return null;
     }
   };

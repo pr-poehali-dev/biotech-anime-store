@@ -12,6 +12,7 @@ const NAV = [
   { id: "home", label: "Главная" },
   { id: "catalog", label: "Каталог" },
   { id: "services", label: "Услуги" },
+  { id: "game", label: "🎮 Игра" },
   { id: "veterans", label: "Ветеранам СВО" },
   { id: "delivery", label: "Доставка и оплата" },
   { id: "contacts", label: "Контакты" },

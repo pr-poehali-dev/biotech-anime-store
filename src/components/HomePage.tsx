@@ -34,8 +34,8 @@ export default function HomePage({ setPage, products, addToCart }: Props) {
               Официальный маркетплейс
             </div>
             <h1 className="text-4xl md:text-5xl font-black leading-tight mb-4">
-              Маркет Товаров<br />
-              <span className="text-blue-200">и Биотехнологий</span>
+              МТМ Маркет<br />
+              <span className="text-blue-200">Услуги профессионалов</span>
             </h1>
             <p className="text-blue-100 text-lg mb-8 max-w-md">
               Передовые биотехнологические продукты для вашего здоровья. Лицензированная продукция, доставка по всей России.
@@ -151,7 +151,7 @@ export default function HomePage({ setPage, products, addToCart }: Props) {
 
       <footer className="py-6 px-4 bg-slate-900 text-slate-400 text-center text-xs">
         <div className="container mx-auto">
-          © 2024 Маркет Товаров и Биотехнологий. Все права защищены.
+          © 2025 МТМ Маркет — Медтех · Ремонт ПК · Биотехнологии. Все права защищены.
           <br />
           Продукция сертифицирована и имеет необходимые разрешения.
         </div>

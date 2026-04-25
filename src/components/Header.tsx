@@ -29,13 +29,13 @@ export default function Header({ page, setPage, cartCount }: HeaderProps) {
             className="flex items-center gap-2 group"
           >
             <div className="w-9 h-9 rounded-xl hero-gradient flex items-center justify-center text-white font-black text-sm">
-              МТБ
+              МТМ
             </div>
             <div className="hidden sm:block">
               <div className="font-black text-sm leading-tight text-foreground" style={{ fontFamily: "Montserrat, sans-serif" }}>
-                Маркет Товаров
+                МТМ Маркет
               </div>
-              <div className="text-xs text-muted-foreground leading-tight">и Биотехнологий</div>
+              <div className="text-xs text-muted-foreground leading-tight">Медтех · Ремонт ПК · Биотехнологии</div>
             </div>
           </button>
 

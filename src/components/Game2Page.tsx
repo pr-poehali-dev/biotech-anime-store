@@ -30,7 +30,7 @@ export default function Game2Page() {
     if (player) { loadGameData(); }
   }, [player, loadGameData]);
 
-  const handleAuth = (p: Player) => {
+  const handleAuth = (p: Player, _token?: string) => {
     setPlayer(p);
   };
 
@@ -113,7 +113,12 @@ export default function Game2Page() {
               <ArmyPanel units={units} player={player} bases={bases} onRefresh={handleRefresh} />
             )}
             {tab === 'combat' && (
-              <CombatPanel player={player} onRefresh={handleRefresh} />
+              <CombatPanel
+                player={player}
+                units={units.map(u => ({ id: u.id, type: u.type, hp: u.hp, max_hp: u.max_hp, attack: u.attack }))}
+                onRefresh={handleRefresh}
+                biome="temperate"
+              />
             )}
             {tab === 'alliance' && (
               <AlliancePanel player={player} onRefresh={handleRefresh} />

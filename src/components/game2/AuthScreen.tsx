@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { apiLogin, apiRegister, setToken } from './api';
+import { apiLogin, apiRegister, apiMe, setToken } from './api';
 import type { Player } from './usePlayer';
 
 type Props = {
@@ -49,7 +49,9 @@ export default function AuthScreen({ onAuth }: Props) {
     try {
       const data = await apiLogin(form.login || form.email, form.password);
       setToken(data.token);
-      onAuth(data.player, data.token);
+      // Загружаем свежие данные игрока с сервера
+      const me = await apiMe();
+      onAuth(me as Player, data.token);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Ошибка');
     } finally { setLoading(false); }
@@ -60,19 +62,54 @@ export default function AuthScreen({ onAuth }: Props) {
     try {
       const data = await apiRegister({ email: form.email, nickname: form.nickname, login: form.login, password: form.password, faction });
       setToken(data.token);
-      onAuth({ id: data.player_id, nickname: form.nickname, faction, energy: 1000, gold: 500, metal: 300, crystal: 200, bio_matter: 100, score: 0, alliance_id: null, planet_id: null, pos_x: 50, pos_y: 50 } as Player, data.token);
+      // Загружаем данные игрока с сервера после регистрации
+      const me = await apiMe();
+      onAuth(me as Player, data.token);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Ошибка');
     } finally { setLoading(false); }
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 flex items-center justify-center px-4">
-      <div className="w-full max-w-md">
+    <div className="min-h-screen bg-slate-950 flex items-center justify-center px-4 relative overflow-hidden">
+      {/* Animated star field */}
+      <div className="absolute inset-0 pointer-events-none">
+        {[...Array(60)].map((_, i) => (
+          <div
+            key={i}
+            className="absolute rounded-full bg-white anim-twinkle"
+            style={{
+              width: (i % 3) + 1,
+              height: (i % 3) + 1,
+              left: `${(i * 16.18) % 100}%`,
+              top: `${(i * 9.73) % 100}%`,
+              animationDelay: `${(i * 0.17) % 3}s`,
+              animationDuration: `${2 + (i % 3)}s`,
+            }}
+          />
+        ))}
+        {/* Moving comets */}
+        {[...Array(3)].map((_, i) => (
+          <div
+            key={`comet-${i}`}
+            className="absolute h-px bg-gradient-to-r from-transparent via-white to-transparent opacity-40"
+            style={{
+              width: 80 + i * 40,
+              top: `${20 + i * 25}%`,
+              left: `${(i * 30) % 70}%`,
+              transform: 'rotate(-25deg)',
+              animation: `marchRight ${4 + i * 2}s linear infinite`,
+              animationDelay: `${i * 1.5}s`,
+            }}
+          />
+        ))}
+      </div>
+
+      <div className="w-full max-w-md relative z-10">
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="text-6xl mb-3">🌌</div>
-          <h1 className="text-3xl font-black text-white mb-1">Эпоха Звёзд</h1>
+          <div className="text-6xl mb-3" style={{ filter: 'drop-shadow(0 0 20px #3b82f6)' }}>🌌</div>
+          <h1 className="text-3xl font-black text-white mb-1" style={{ textShadow: '0 0 30px rgba(59,130,246,0.5)' }}>Эпоха Звёзд</h1>
           <p className="text-slate-400 text-sm">Многопользовательская браузерная стратегия</p>
         </div>
 

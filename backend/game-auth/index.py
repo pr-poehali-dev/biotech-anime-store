@@ -28,12 +28,11 @@ def handler(event: dict, context) -> dict:
 
     method = event.get('httpMethod', 'GET')
     params = event.get('queryStringParameters') or {}
-    action = params.get('action', 'login')
     body = {}
     if event.get('body'):
         body = json.loads(event['body'])
-    if not action and method == 'POST':
-        action = body.get('action', 'login')
+    # action берём из body (POST) или query params (GET)
+    action = body.get('action') or params.get('action', 'me' if method == 'GET' else '')
 
     conn = get_conn()
     cur = conn.cursor()

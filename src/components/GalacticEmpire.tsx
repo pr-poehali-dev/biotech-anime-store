@@ -917,11 +917,16 @@ export default function GalacticEmpire() {
                     const s = SECTOR_STYLES[sys.sector];
                     if (!s) return null;
                     const isCore = sys.sector==="core";
+                    // Радиус ореола считаем как максимальная орбита планет в этой системе
+                    const starR = (sys.star_size||5)*1.4 + 12;
+                    const maxOrbits = sys.planet_count || 4;
+                    const maxOrbitR = starR + 26 * (maxOrbits - 1) + 13 + 10;
+                    const haloR = Math.max(isCore ? 80 : 50, maxOrbitR);
                     return (
                       <g key={`halo-${sys.id}`} style={{pointerEvents:"none"}}>
-                        <circle cx={sys.pos_x} cy={sys.pos_y} r={isCore?60:45} fill={s.color} opacity={isCore?"0.12":"0.07"}/>
-                        <circle cx={sys.pos_x} cy={sys.pos_y} r={isCore?60:45} fill="none" stroke={s.color} strokeWidth={isCore?"1.5":"0.8"} opacity={isCore?"0.5":"0.3"} strokeDasharray={isCore?"":"6 3"}/>
-                        <text x={sys.pos_x} y={sys.pos_y-(isCore?68:52)} textAnchor="middle" fill={s.color} fontSize="8" opacity="0.7" fontWeight="bold">{s.icon} {s.label}</text>
+                        <circle cx={sys.pos_x} cy={sys.pos_y} r={haloR} fill={s.color} opacity={isCore?"0.08":"0.05"}/>
+                        <circle cx={sys.pos_x} cy={sys.pos_y} r={haloR} fill="none" stroke={s.color} strokeWidth={isCore?"1.5":"0.7"} opacity={isCore?"0.45":"0.25"} strokeDasharray={isCore?"":"6 4"}/>
+                        <text x={sys.pos_x} y={sys.pos_y-(haloR+8)} textAnchor="middle" fill={s.color} fontSize="8" opacity="0.65" fontWeight="bold">{s.icon} {s.label}</text>
                       </g>
                     );
                   })}
@@ -948,26 +953,47 @@ export default function GalacticEmpire() {
                     );
                   })}
 
-                  {/* Планеты активной системы */}
-                  {selSystem && sysDetail && (sysDetail.planets||[]).map((p:Planet, i:number)=>{
-                    const cnt = (sysDetail.planets||[]).length||1;
-                    const angle = (i/cnt)*Math.PI*2 - Math.PI/2;
-                    const orbitR = 38 + i*20;
-                    const px = selSystem.pos_x + Math.cos(angle)*orbitR;
-                    const py = selSystem.pos_y + Math.sin(angle)*orbitR;
-                    const col = PLANET_COLORS[p.planet_type] || "#94a3b8";
-                    const pr = (p.size||3)*0.9+2;
-                    const strokeCol = p.owner_id===res.id?"#22c55e":p.is_ai_controlled?"#ef4444":p.owner_id?"#f59e0b":"none";
-                    const isSelP = selPlanet?.id===p.id;
-                    return (
-                      <g key={p.id} onClick={e=>{e.stopPropagation();setSelPlanet(p);setSpyPanel(false);}}>
-                        <circle cx={selSystem.pos_x} cy={selSystem.pos_y} r={orbitR} fill="none" stroke="white" strokeWidth="0.25" opacity="0.12"/>
-                        {isSelP && <circle cx={px} cy={py} r={pr+5} fill="none" stroke={col} strokeWidth="1" strokeDasharray="2 2" opacity="0.7"/>}
-                        <circle cx={px} cy={py} r={pr+3} fill={col} opacity="0.15"/>
-                        <circle cx={px} cy={py} r={pr} fill={col} opacity={isSelP?1:0.75} stroke={strokeCol} strokeWidth="1.5"/>
-                      </g>
-                    );
-                  })}
+                  {/* Планеты активной системы — каждая на своём кольце */}
+                  {selSystem && sysDetail && (() => {
+                    const pls = sysDetail.planets || [];
+                    // Звезда занимает ~(starSize*1.4+3+6)px радиуса → первая орбита дальше
+                    const starR = (selSystem.star_size||5)*1.4 + 12;
+                    // Шаг орбит: достаточно чтобы кольца не касались (планета ≤8px радиус + зазор 6px)
+                    const ORBIT_STEP = 26;
+                    return pls.map((p:Planet, i:number) => {
+                      const orbitR = starR + ORBIT_STEP * i + ORBIT_STEP * 0.5;
+                      // Угол: 1 планета — сверху; несколько — равномерно по кругу
+                      const angle = pls.length === 1
+                        ? -Math.PI / 2
+                        : (i / pls.length) * Math.PI * 2 - Math.PI / 2;
+                      const px = selSystem.pos_x + Math.cos(angle) * orbitR;
+                      const py = selSystem.pos_y + Math.sin(angle) * orbitR;
+                      const col = PLANET_COLORS[p.planet_type] || "#94a3b8";
+                      // Размер планеты масштабируем но ограничиваем чтобы не вылезала за орбиту
+                      const pr = Math.min((p.size||50)/14 + 3, ORBIT_STEP/2 - 3);
+                      const strokeCol = p.owner_id===res.id?"#22c55e":p.is_ai_controlled?"#ef4444":p.owner_id?"#f59e0b":"none";
+                      const isSelP = selPlanet?.id===p.id;
+                      return (
+                        <g key={p.id} onClick={e=>{e.stopPropagation();setSelPlanet(p);setSpyPanel(false);}}>
+                          {/* Орбитальное кольцо */}
+                          <circle cx={selSystem.pos_x} cy={selSystem.pos_y} r={orbitR}
+                            fill="none" stroke="white" strokeWidth="0.3" opacity="0.10"/>
+                          {/* Выделение */}
+                          {isSelP && <circle cx={px} cy={py} r={pr+5}
+                            fill="none" stroke={col} strokeWidth="1.2" strokeDasharray="3 2" opacity="0.8"/>}
+                          {/* Свечение */}
+                          <circle cx={px} cy={py} r={pr+4} fill={col} opacity="0.12"/>
+                          {/* Планета */}
+                          <circle cx={px} cy={py} r={pr}
+                            fill={col} opacity={isSelP?1:0.82}
+                            stroke={strokeCol} strokeWidth="1.5"/>
+                          {/* Блик */}
+                          <circle cx={px-pr*0.3} cy={py-pr*0.3} r={pr*0.28}
+                            fill="white" opacity="0.22"/>
+                        </g>
+                      );
+                    });
+                  })()}
                 </g>
               </svg>
             </div>

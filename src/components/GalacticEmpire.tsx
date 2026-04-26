@@ -114,7 +114,7 @@ function resIcon(k:string) { return k==="metal"?"⛏️":k==="energy"?"⚡":k===
 export default function GalacticEmpire() {
   const [phase,  setPhase]  = useState<"auth"|"game">("auth");
   const [authTab,setAuthTab]= useState<"login"|"register">("login");
-  const [form,   setForm]   = useState({nickname:"",login:"",password:"",race:"solarians" as RaceId});
+  const [form,   setForm]   = useState({email:"",nickname:"",login:"",password:"",race:"solarians" as RaceId});
   const [authErr,setAuthErr]= useState("");
   const [loading,setLoading]= useState(false);
   const [token,  setToken]  = useState(()=>localStorage.getItem("ge_token")||"");
@@ -250,7 +250,7 @@ export default function GalacticEmpire() {
     setAuthErr(""); setLoading(true);
     try {
       const body = authTab==="register"
-        ? {action:"register",...form}
+        ? {action:"register", login:form.login, nickname:form.nickname, password:form.password, race:form.race}
         : {action:"login", login:form.login, password:form.password};
       const d = await api(API.auth, {method:"POST", body});
       if (d.error) { setAuthErr(d.error); return; }
@@ -393,7 +393,17 @@ export default function GalacticEmpire() {
 
             {authTab==="register" && <>
               <div className="mb-3">
-                <label className="text-xs text-slate-400 mb-1 block">Имя командира</label>
+                <label className="text-xs text-slate-400 mb-1 block">Почта</label>
+                <input type="email" value={form.email} onChange={e=>setForm(f=>({...f,email:e.target.value}))}
+                  placeholder="commander@galaxy.net" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-500 transition"/>
+              </div>
+              <div className="mb-3">
+                <label className="text-xs text-slate-400 mb-1 block">Логин</label>
+                <input value={form.login} onChange={e=>setForm(f=>({...f,login:e.target.value}))}
+                  placeholder="admiral_nova" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-500 transition"/>
+              </div>
+              <div className="mb-3">
+                <label className="text-xs text-slate-400 mb-1 block">Никнейм (имя в игре)</label>
                 <input value={form.nickname} onChange={e=>setForm(f=>({...f,nickname:e.target.value}))}
                   placeholder="Адмирал Нова" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-500 transition"/>
               </div>
@@ -402,7 +412,7 @@ export default function GalacticEmpire() {
                 <div className="grid grid-cols-3 gap-1.5">
                   {(Object.entries(RACES) as [RaceId,typeof RACES[RaceId]][]).map(([id,r])=>(
                     <button key={id} onClick={()=>setForm(f=>({...f,race:id}))}
-                      className={`text-left px-2 py-2 rounded-xl border text-xs transition-all ${form.race===id?"border-blue-400 bg-blue-500/20":"border-white/10 hover:border-white/30 bg-white/3"}`}>
+                      className={`text-left px-2 py-2 rounded-xl border text-xs transition-all ${form.race===id?"border-blue-400 bg-blue-500/20":"border-white/10 hover:border-white/30 bg-white/5"}`}>
                       <div className="text-lg mb-0.5">{r.icon}</div>
                       <div className="font-bold text-[11px] leading-tight">{r.name}</div>
                       <div className="text-[9px] text-white/40 mt-0.5 leading-tight">{r.bonus.split(",")[0]}</div>
@@ -412,11 +422,12 @@ export default function GalacticEmpire() {
               </div>
             </>}
 
-            <div className="mb-3">
+            {authTab==="login" && <div className="mb-3">
               <label className="text-xs text-slate-400 mb-1 block">Логин</label>
               <input value={form.login} onChange={e=>setForm(f=>({...f,login:e.target.value}))}
-                placeholder="commander@galaxy.net" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-500 transition"/>
-            </div>
+                placeholder="admiral_nova" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-500 transition"/>
+            </div>}
+
             <div className="mb-4">
               <label className="text-xs text-slate-400 mb-1 block">Пароль</label>
               <input type="password" value={form.password} onChange={e=>setForm(f=>({...f,password:e.target.value}))}

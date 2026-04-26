@@ -11,6 +11,16 @@ import json, os, hashlib, secrets, psycopg2
 S = os.environ.get('MAIN_DB_SCHEMA', 't_p83915249_biotech_anime_store')
 
 RACE_BONUS = {
+    'solarians':    {'metal': 800,  'energy': 1600, 'crystals': 400,  'population': 20, 'fuel': 600, 'dark_matter': 10},
+    'voidstalkers': {'metal': 900,  'energy': 900,  'crystals': 500,  'population': 12, 'fuel': 500, 'dark_matter': 30},
+    'ironborn':     {'metal': 2000, 'energy': 1000, 'crystals': 200,  'population': 10, 'fuel': 700, 'dark_matter': 5},
+    'arboreals':    {'metal': 700,  'energy': 900,  'crystals': 500,  'population': 40, 'fuel': 600, 'dark_matter': 10},
+    'deepones':     {'metal': 600,  'energy': 800,  'crystals': 700,  'population': 18, 'fuel': 400, 'dark_matter': 25},
+    'wraithkin':    {'metal': 700,  'energy': 1100, 'crystals': 600,  'population': 14, 'fuel': 500, 'dark_matter': 20},
+    'psionic':      {'metal': 500,  'energy': 700,  'crystals': 800,  'population': 22, 'fuel': 400, 'dark_matter': 60},
+    'hiveborn':     {'metal': 600,  'energy': 800,  'crystals': 300,  'population': 50, 'fuel': 500, 'dark_matter': 5},
+    'titanforge':   {'metal': 1200, 'energy': 1200, 'crystals': 600,  'population': 18, 'fuel': 800, 'dark_matter': 15},
+    # обратная совместимость со старыми аккаунтами
     'terrans':     {'metal': 1000, 'energy': 800,  'crystals': 400,  'population': 20, 'fuel': 500, 'dark_matter': 10},
     'zephyrians':  {'metal': 700,  'energy': 1400, 'crystals': 400,  'population': 18, 'fuel': 600, 'dark_matter': 15},
     'vorath':      {'metal': 1400, 'energy': 600,  'crystals': 300,  'population': 15, 'fuel': 500, 'dark_matter': 5},

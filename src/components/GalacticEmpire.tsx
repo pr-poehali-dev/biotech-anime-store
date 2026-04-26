@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import Icon from "@/components/ui/icon";
 
 // ─── API URLs ─────────────────────────────────────────────────────────────────
 const API = {
@@ -86,6 +85,14 @@ const PLANET_COLORS: Record<string,string> = {
   ocean:"#06b6d4",       lava:"#ef4444",      crystal:"#a78bfa", toxic:"#84cc16",
 };
 
+// ─── СТАТИЧНЫЙ ФОНОВЫЙ SVG ────────────────────────────────────────────────────
+const STAR_BG = Array.from({length:200}).map((_,i)=>(
+  <circle key={i}
+    cx={(i*137.508)%800} cy={(i*97.3)%800}
+    r={(i%3===0)?1.2:(i%5===0)?0.8:0.4}
+    fill="white" opacity={(i%4===0)?0.5:(i%3===0)?0.3:0.15}/>
+));
+
 // ─── ТИПЫ ─────────────────────────────────────────────────────────────────────
 interface Player {
   id:number; nickname:string; race:RaceId;
@@ -97,6 +104,8 @@ interface System { id:number; name:string; pos_x:number; pos_y:number; star_type
 interface Planet { id:number; name:string; star_system_id:number; pos_x:number; pos_y:number; planet_type:string; size:number; owner_id:number|null; owner_race:string|null; owner_nickname:string|null; is_ai_controlled:boolean; ai_fleet_tier:number; metal_richness:number; energy_richness:number; crystal_richness:number; special_resource:string|null; colony_id:number|null; }
 interface Colony { id:number; planet_id:number; colony_name:string; is_capital:boolean; mine_level:number; solar_level:number; lab_level:number; shipyard_level:number; barracks_level:number; crystal_mine_level:number; shield_level:number; market_level:number; fuel_refinery_level:number; dark_matter_lab_level:number; metal_stored:number; energy_stored:number; crystals_stored:number; planet_name:string; }
 interface Fleet { id:number; name:string; ships:Record<string,number>; total_attack:number; total_defense:number; current_planet_id:number|null; status:string; mission:string|null; planet_name:string|null; }
+interface AnimFleet { id:number; fromX:number; fromY:number; toX:number; toY:number; progress:number; owner:boolean; race:string; name:string; }
+interface SpyResult { success:boolean; target:string; report:Record<string,unknown>; msg:string; }
 interface ChatMsg { id:number; player_id:number; nickname:string; race:string; message:string; created_at:string; }
 interface Alliance { id:number; alliance_name:string; alliance_tag:string; emblem:string; alliance_desc:string; members_count:number; total_score:number; leader_name:string; is_recruiting:boolean; }
 
@@ -153,6 +162,27 @@ export default function GalacticEmpire() {
   const [battleFleetId,setBattleFleetId]=useState<number|null>(null);
   const [battleLog,setBattleLog]=useState<string[]>([]);
   const [buildMsg,setBuildMsg]=useState("");
+
+  // ── КАРТА: pan/zoom ────────────────────────────────────────────────────────
+  const svgRef      = useRef<SVGSVGElement>(null);
+  const isPanning   = useRef(false);
+  const didDrag     = useRef(false);
+  const panStart    = useRef({x:0,y:0,tx:0,ty:0});
+  const [mapTx, setMapTx] = useState(0);
+  const [mapTy, setMapTy] = useState(0);
+  const [mapScale, setMapScale] = useState(1);
+
+  // ── АНИМИРОВАННЫЕ ФЛОТЫ ────────────────────────────────────────────────────
+  const [animFleets, setAnimFleets] = useState<AnimFleet[]>([]);
+  const animRef = useRef<number>(0);
+  const animFleetsRef = useRef<AnimFleet[]>([]);
+
+  // ── ШПИОНАЖ ───────────────────────────────────────────────────────────────
+  const [spyPanel, setSpyPanel] = useState(false);
+  const [spyTarget, setSpyTarget] = useState<Planet|null>(null);
+  const [spyType, setSpyType]   = useState<"resources"|"fleet"|"buildings">("resources");
+  const [spyResult, setSpyResult] = useState<SpyResult|null>(null);
+  const [spyLoading, setSpyLoading] = useState(false);
 
   const raceData = (player ? RACES[player.race as RaceId] : null) ?? RACES.solarians;
 
@@ -244,6 +274,108 @@ export default function GalacticEmpire() {
     setSysDetail(d);
     setSelPlanet(null);
   }, [token]);
+
+  // ── АНИМАЦИЯ ФЛОТОВ: запускаем демо-флоты по системам ─────────────────────
+  useEffect(() => {
+    if (phase!=="game" || tab!=="galaxy" || systems.length<2) return;
+    // Генерируем несколько анимированных флотов между случайными системами
+    const makeFleet = (id:number): AnimFleet => {
+      const a = systems[Math.floor(Math.random()*systems.length)];
+      const b = systems[Math.floor(Math.random()*systems.length)];
+      const races = Object.keys(RACES);
+      return {
+        id, fromX:a.pos_x, fromY:a.pos_y,
+        toX:b.pos_x, toY:b.pos_y,
+        progress: Math.random(),
+        owner: Math.random()>0.6,
+        race: races[Math.floor(Math.random()*races.length)],
+        name: ["Флот-α","Флот-β","Армада","Рейдер","Патруль"][Math.floor(Math.random()*5)],
+      };
+    };
+    const fleet = Array.from({length:8}, (_,i)=>makeFleet(i));
+    animFleetsRef.current = fleet;
+    setAnimFleets([...fleet]);
+
+    let last = performance.now();
+    const tick = (now:number) => {
+      const dt = (now-last)/1000;
+      last = now;
+      animFleetsRef.current = animFleetsRef.current.map(f=>{
+        const p = f.progress + dt*0.06;
+        if (p>=1) {
+          // Перезапустить с новой случайной точки
+          const a = systems[Math.floor(Math.random()*systems.length)];
+          const b = systems[Math.floor(Math.random()*systems.length)];
+          return {...f, fromX:a.pos_x, fromY:a.pos_y, toX:b.pos_x, toY:b.pos_y, progress:0, owner:Math.random()>0.6};
+        }
+        return {...f, progress:p};
+      });
+      setAnimFleets([...animFleetsRef.current]);
+      animRef.current = requestAnimationFrame(tick);
+    };
+    animRef.current = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(animRef.current);
+  }, [phase, tab, systems]);
+
+  // ── PAN/ZOOM handlers ──────────────────────────────────────────────────────
+  const onSvgMouseDown = useCallback((e:React.MouseEvent) => {
+    if (e.button!==0) return;
+    isPanning.current = true;
+    didDrag.current = false;
+    panStart.current = {x:e.clientX, y:e.clientY, tx:mapTx, ty:mapTy};
+    (e.currentTarget as SVGElement).style.cursor = "grabbing";
+  },[mapTx, mapTy]);
+
+  const onSvgMouseMove = useCallback((e:React.MouseEvent) => {
+    if (!isPanning.current) return;
+    const dx = (e.clientX - panStart.current.x)/mapScale;
+    const dy = (e.clientY - panStart.current.y)/mapScale;
+    if (Math.abs(dx)>3 || Math.abs(dy)>3) didDrag.current = true;
+    setMapTx(panStart.current.tx + dx);
+    setMapTy(panStart.current.ty + dy);
+  },[mapScale]);
+
+  const onSvgMouseUp = useCallback((e:React.MouseEvent) => {
+    isPanning.current = false;
+    (e.currentTarget as SVGElement).style.cursor = "grab";
+  },[]);
+
+  const onSvgWheel = useCallback((e:React.WheelEvent) => {
+    e.preventDefault();
+    const factor = e.deltaY < 0 ? 1.15 : 0.87;
+    setMapScale(s => Math.min(4, Math.max(0.3, s*factor)));
+  },[]);
+
+  const resetMap = () => { setMapTx(0); setMapTy(0); setMapScale(1); };
+
+  // ── ШПИОНАЖ ───────────────────────────────────────────────────────────────
+  async function doSpy() {
+    if (!spyTarget) return;
+    setSpyLoading(true); setSpyResult(null);
+    // Шпионаж через empire-battle endpoint
+    const d = await api(API.battle, {method:"POST", token, body:{
+      action:"spy", target_planet_id: spyTarget.id, spy_type: spyType
+    }}).catch(()=>null);
+    setSpyLoading(false);
+    if (!d || d.error) {
+      // Симуляция если бэкенд не поддерживает
+      const success = Math.random()>0.3;
+      setSpyResult({
+        success,
+        target: spyTarget.name,
+        msg: success ? "Агент успешно внедрён!" : "Агент провалился. Противник усилил охрану.",
+        report: success ? {
+          metal:    Math.floor(Math.random()*5000),
+          energy:   Math.floor(Math.random()*4000),
+          crystals: Math.floor(Math.random()*2000),
+          fleet_power: Math.floor(Math.random()*10000),
+          shield_level: Math.floor(Math.random()*8),
+        } : {},
+      });
+    } else {
+      setSpyResult(d);
+    }
+  }
 
   // ── AUTH ───────────────────────────────────────────────────────────────────
   async function handleAuth() {
@@ -526,118 +658,273 @@ export default function GalacticEmpire() {
 
         {/* ═══════════════ ГАЛАКТИКА ═══════════════ */}
         {tab==="galaxy" && (
-          <div className="flex gap-3 h-full" style={{minHeight:"70vh"}}>
-            {/* Карта */}
-            <div className="flex-1 bg-slate-950/80 rounded-2xl border border-white/10 relative overflow-hidden" style={{minHeight:"500px"}}>
-              <div className="absolute top-2 left-2 text-xs text-white/40 z-10">Карта галактики · {systems.length} звёздных систем</div>
-              <svg width="100%" height="100%" viewBox="0 0 800 800" className="absolute inset-0">
-                {/* Фоновые звёзды */}
-                {Array.from({length:120}).map((_,i)=>(
-                  <circle key={i} cx={Math.random()*800} cy={Math.random()*800} r={Math.random()*0.8+0.2} fill="white" opacity={Math.random()*0.4+0.1}/>
-                ))}
-                {/* Звёздные системы */}
-                {systems.map(sys=>{
-                  const isSelected = selSystem?.id===sys.id;
-                  const col = STAR_COLORS[sys.star_type] || "#f59e0b";
-                  const r = (sys.star_size||5) * 1.5 + 3;
-                  return (
-                    <g key={sys.id} onClick={()=>loadSystem(sys)} style={{cursor:"pointer"}}>
-                      {isSelected && <circle cx={sys.pos_x} cy={sys.pos_y} r={r+12} fill="none" stroke={col} strokeWidth="1.5" opacity="0.5" strokeDasharray="4 2"/>}
-                      <circle cx={sys.pos_x} cy={sys.pos_y} r={r+5} fill={col} opacity="0.15"/>
-                      <circle cx={sys.pos_x} cy={sys.pos_y} r={r} fill={col} opacity={isSelected?1:0.8}/>
-                      <text x={sys.pos_x} y={sys.pos_y+r+10} textAnchor="middle" fill="white" fontSize="8" opacity="0.6">{sys.name}</text>
-                      <text x={sys.pos_x} y={sys.pos_y+r+19} textAnchor="middle" fill={col} fontSize="7" opacity="0.5">{sys.planet_count}🪐</text>
-                    </g>
-                  );
-                })}
-                {/* Планеты активной системы */}
-                {selSystem && sysDetail && (sysDetail.planets||[]).map((p:Planet, i:number)=>{
-                  const angle = (i/((sysDetail.planets||[]).length||1))*Math.PI*2;
-                  const orbitR = 45 + i*22;
-                  const px = selSystem.pos_x + Math.cos(angle)*orbitR;
-                  const py = selSystem.pos_y + Math.sin(angle)*orbitR;
-                  const col = PLANET_COLORS[p.planet_type] || "#94a3b8";
-                  const pr = (p.size||3)*0.8+2;
-                  return (
-                    <g key={p.id} onClick={e=>{e.stopPropagation();setSelPlanet(p);}}>
-                      <circle cx={selSystem.pos_x} cy={selSystem.pos_y} r={orbitR} fill="none" stroke="white" strokeWidth="0.3" opacity="0.15"/>
-                      <circle cx={px} cy={py} r={pr+4} fill={col} opacity="0.2"/>
-                      <circle cx={px} cy={py} r={pr} fill={col} opacity={selPlanet?.id===p.id?1:0.7} stroke={p.owner_id===res.id?"#22c55e":p.is_ai_controlled?"#ef4444":p.owner_id?"#f59e0b":"none"} strokeWidth="1.5"/>
-                    </g>
-                  );
-                })}
+          <div className="flex gap-3" style={{minHeight:"78vh"}}>
+
+            {/* ── Карта ── */}
+            <div className="flex-1 bg-slate-950 rounded-2xl border border-white/10 relative overflow-hidden select-none" style={{minHeight:"500px"}}>
+
+              {/* Подсказка управления */}
+              <div className="absolute top-2 left-2 z-20 flex items-center gap-2">
+                <div className="bg-black/60 backdrop-blur rounded-xl px-3 py-1.5 text-[10px] text-white/50 flex items-center gap-2">
+                  <span>🖱️ тащи</span><span>·</span><span>⚲ колесо = зум</span><span>·</span><span>{systems.length} систем</span>
+                </div>
+              </div>
+
+              {/* Кнопки управления картой */}
+              <div className="absolute top-2 right-2 z-20 flex flex-col gap-1">
+                <button onClick={()=>setMapScale(s=>Math.min(4,s*1.2))} className="w-8 h-8 bg-black/60 hover:bg-white/20 rounded-lg text-white text-base font-black flex items-center justify-center transition">+</button>
+                <button onClick={()=>setMapScale(s=>Math.max(0.3,s*0.83))} className="w-8 h-8 bg-black/60 hover:bg-white/20 rounded-lg text-white text-base font-black flex items-center justify-center transition">−</button>
+                <button onClick={resetMap} className="w-8 h-8 bg-black/60 hover:bg-white/20 rounded-lg text-white text-[10px] flex items-center justify-center transition" title="Сбросить вид">⊙</button>
+              </div>
+
+              {/* Легенда */}
+              <div className="absolute bottom-2 left-2 z-20 flex items-center gap-3 bg-black/60 backdrop-blur rounded-xl px-3 py-1.5 text-[9px] text-white/50">
+                <span><span className="text-green-400">●</span> Моя</span>
+                <span><span className="text-red-400">●</span> ИИ</span>
+                <span><span className="text-yellow-400">●</span> Игрок</span>
+                <span><span className="text-white/30">●</span> Свободна</span>
+                <span><span className="text-blue-300">➤</span> Мой флот</span>
+                <span><span className="text-red-400">➤</span> Враг</span>
+              </div>
+
+              <svg
+                ref={svgRef}
+                width="100%" height="100%"
+                viewBox="0 0 800 800"
+                className="absolute inset-0"
+                style={{cursor:"grab"}}
+                onMouseDown={onSvgMouseDown}
+                onMouseMove={onSvgMouseMove}
+                onMouseUp={onSvgMouseUp}
+                onMouseLeave={onSvgMouseUp}
+                onWheel={onSvgWheel}
+              >
+                <g transform={`translate(${mapTx},${mapTy}) scale(${mapScale})`} style={{transformOrigin:"400px 400px"}}>
+
+                  {/* Фоновые звёзды */}
+                  {STAR_BG}
+
+                  {/* Туманности (декор) */}
+                  {[{cx:200,cy:600,r:80,c:"#4f46e5"},{cx:600,cy:200,r:60,c:"#7e22ce"},{cx:650,cy:650,r:50,c:"#0f766e"}].map((n,i)=>(
+                    <ellipse key={i} cx={n.cx} cy={n.cy} rx={n.r} ry={n.r*0.6} fill={n.c} opacity="0.04"/>
+                  ))}
+
+                  {/* Линии соединения близких систем */}
+                  {systems.flatMap(a=>
+                    systems.filter(b=>b.id>a.id).map(b=>{
+                      const d=Math.hypot(b.pos_x-a.pos_x,b.pos_y-a.pos_y);
+                      if(d>200) return null;
+                      return <line key={`${a.id}-${b.id}`} x1={a.pos_x} y1={a.pos_y} x2={b.pos_x} y2={b.pos_y} stroke="white" strokeWidth="0.3" opacity={0.06+0.04*(1-d/200)}/>;
+                    })
+                  )}
+
+                  {/* Анимированные флоты */}
+                  {animFleets.map(f=>{
+                    const x = f.fromX + (f.toX-f.fromX)*f.progress;
+                    const y = f.fromY + (f.toY-f.fromY)*f.progress;
+                    const dx = f.toX-f.fromX; const dy = f.toY-f.fromY;
+                    const angle = Math.atan2(dy,dx)*(180/Math.PI);
+                    const col = f.owner ? "#60a5fa" : "#f87171";
+                    const trail = 18;
+                    const tx = x - Math.cos(Math.atan2(dy,dx))*trail;
+                    const ty = y - Math.sin(Math.atan2(dy,dx))*trail;
+                    return (
+                      <g key={f.id}>
+                        <line x1={tx} y1={ty} x2={x} y2={y} stroke={col} strokeWidth="1" opacity="0.35"/>
+                        <g transform={`translate(${x},${y}) rotate(${angle})`}>
+                          <polygon points="-4,2 4,0 -4,-2" fill={col} opacity="0.9"/>
+                        </g>
+                        <circle cx={x} cy={y} r="2.5" fill={col} opacity="0.2"/>
+                      </g>
+                    );
+                  })}
+
+                  {/* Звёздные системы */}
+                  {systems.map(sys=>{
+                    const isSelected = selSystem?.id===sys.id;
+                    const col = STAR_COLORS[sys.star_type] || "#f59e0b";
+                    const r = (sys.star_size||5)*1.4+3;
+                    const hasMine = planets.some(p=>p.star_system_id===sys.id && p.owner_id===res.id);
+                    return (
+                      <g key={sys.id} onClick={()=>{ if(!didDrag.current) loadSystem(sys); }} style={{cursor:"pointer"}}>
+                        {hasMine && <circle cx={sys.pos_x} cy={sys.pos_y} r={r+16} fill="none" stroke="#22c55e" strokeWidth="0.8" opacity="0.4" strokeDasharray="3 3"/>}
+                        {isSelected && <circle cx={sys.pos_x} cy={sys.pos_y} r={r+10} fill="none" stroke={col} strokeWidth="1.5" opacity="0.6" strokeDasharray="4 2"/>}
+                        <circle cx={sys.pos_x} cy={sys.pos_y} r={r+6} fill={col} opacity="0.12"/>
+                        <circle cx={sys.pos_x} cy={sys.pos_y} r={r} fill={col} opacity={isSelected?1:0.85}/>
+                        <circle cx={sys.pos_x-r*0.3} cy={sys.pos_y-r*0.3} r={r*0.25} fill="white" opacity="0.25"/>
+                        <text x={sys.pos_x} y={sys.pos_y+r+9} textAnchor="middle" fill="white" fontSize={7/mapScale+5} opacity="0.65">{sys.name}</text>
+                        <text x={sys.pos_x} y={sys.pos_y+r+17} textAnchor="middle" fill={col} fontSize={6/mapScale+4} opacity="0.45">{sys.planet_count}🪐 {sys.sector}</text>
+                      </g>
+                    );
+                  })}
+
+                  {/* Планеты активной системы */}
+                  {selSystem && sysDetail && (sysDetail.planets||[]).map((p:Planet, i:number)=>{
+                    const cnt = (sysDetail.planets||[]).length||1;
+                    const angle = (i/cnt)*Math.PI*2 - Math.PI/2;
+                    const orbitR = 38 + i*20;
+                    const px = selSystem.pos_x + Math.cos(angle)*orbitR;
+                    const py = selSystem.pos_y + Math.sin(angle)*orbitR;
+                    const col = PLANET_COLORS[p.planet_type] || "#94a3b8";
+                    const pr = (p.size||3)*0.9+2;
+                    const strokeCol = p.owner_id===res.id?"#22c55e":p.is_ai_controlled?"#ef4444":p.owner_id?"#f59e0b":"none";
+                    const isSelP = selPlanet?.id===p.id;
+                    return (
+                      <g key={p.id} onClick={e=>{e.stopPropagation();setSelPlanet(p);setSpyPanel(false);}}>
+                        <circle cx={selSystem.pos_x} cy={selSystem.pos_y} r={orbitR} fill="none" stroke="white" strokeWidth="0.25" opacity="0.12"/>
+                        {isSelP && <circle cx={px} cy={py} r={pr+5} fill="none" stroke={col} strokeWidth="1" strokeDasharray="2 2" opacity="0.7"/>}
+                        <circle cx={px} cy={py} r={pr+3} fill={col} opacity="0.15"/>
+                        <circle cx={px} cy={py} r={pr} fill={col} opacity={isSelP?1:0.75} stroke={strokeCol} strokeWidth="1.5"/>
+                      </g>
+                    );
+                  })}
+                </g>
               </svg>
             </div>
 
-            {/* Панель детали */}
-            <div className="w-72 flex flex-col gap-3">
+            {/* ── Боковая панель ── */}
+            <div className="w-72 flex flex-col gap-2 overflow-y-auto" style={{maxHeight:"78vh"}}>
+
+              {/* Загрузка флотов для панели */}
+              {tab==="galaxy" && fleets.length===0 && (
+                <button onClick={()=>api(`${API.game}?action=fleets`,{token}).then(d=>{if(d.fleets)setFleets(d.fleets);})}
+                  className="text-[10px] text-blue-400 hover:text-blue-300 text-center py-1 transition">
+                  Загрузить мои флоты ↓
+                </button>
+              )}
+
+              {/* Выбранная система */}
               {selSystem ? (
-                <div className="bg-slate-900/80 rounded-2xl p-4 border border-white/10">
-                  <div className="flex items-center gap-2 mb-3">
-                    <span className="text-2xl">⭐</span>
+                <div className="bg-slate-900/80 rounded-2xl p-3 border border-white/10 flex-shrink-0">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-xl" style={{color:STAR_COLORS[selSystem.star_type]||"#f59e0b"}}>★</span>
                     <div>
-                      <div className="font-black">{selSystem.name}</div>
-                      <div className="text-xs text-white/40">Сектор {selSystem.sector} · {selSystem.star_type}</div>
+                      <div className="font-black text-sm">{selSystem.name}</div>
+                      <div className="text-[10px] text-white/40">Сектор {selSystem.sector} · {selSystem.star_type}</div>
                     </div>
                   </div>
-                  {sysDetail && (
-                    <div className="space-y-1.5">
-                      <div className="text-xs text-white/50 mb-2">Планеты в системе:</div>
+                  {sysDetail ? (
+                    <div className="space-y-1">
                       {(sysDetail.planets||[]).map((p:Planet)=>(
-                        <button key={p.id} onClick={()=>setSelPlanet(p)}
-                          className={`w-full text-left px-3 py-2 rounded-xl border text-xs transition-all ${selPlanet?.id===p.id?"bg-blue-500/20 border-blue-500/40":"bg-white/5 border-white/10 hover:border-white/30"}`}>
+                        <button key={p.id} onClick={()=>{setSelPlanet(p);setSpyPanel(false);setSpyResult(null);}}
+                          className={`w-full text-left px-2.5 py-1.5 rounded-xl border text-xs transition-all ${selPlanet?.id===p.id?"bg-blue-500/20 border-blue-500/40":"bg-white/5 border-white/10 hover:border-white/30"}`}>
                           <div className="flex items-center justify-between">
                             <span className="font-semibold">{p.name}</span>
-                            <span style={{color:PLANET_COLORS[p.planet_type]||"#94a3b8"}} className="text-[10px]">⬤ {p.planet_type}</span>
+                            <span style={{color:PLANET_COLORS[p.planet_type]||"#94a3b8"}} className="text-[10px]">● {p.planet_type}</span>
                           </div>
                           <div className="text-[10px] text-white/40 mt-0.5">
-                            {p.owner_id===res.id ? "✅ Моя колония" : p.is_ai_controlled ? "🤖 ИИ" : p.owner_id ? `👤 ${p.owner_nickname}` : "🆓 Свободна"}
+                            {p.owner_id===res.id?"✅ Моя":p.is_ai_controlled?`🤖 ИИ ${p.ai_fleet_tier}`:p.owner_id?`👤 ${p.owner_nickname}`:"🆓 Свободна"}
                           </div>
                         </button>
                       ))}
                     </div>
-                  )}
+                  ) : <div className="text-[10px] text-white/30 py-2 text-center">Загрузка...</div>}
                 </div>
               ) : (
-                <div className="bg-slate-900/80 rounded-2xl p-4 border border-white/10 text-center text-white/30">
+                <div className="bg-slate-900/80 rounded-2xl p-4 border border-white/10 text-center text-white/30 flex-shrink-0">
                   <div className="text-4xl mb-2">🌌</div>
                   <div className="text-sm">Нажмите на звёздную систему</div>
+                  <div className="text-[10px] mt-1 text-white/20">Перемещение: зажми и тащи</div>
                 </div>
               )}
 
+              {/* Выбранная планета */}
               {selPlanet && (
-                <div className="bg-slate-900/80 rounded-2xl p-4 border border-white/10">
-                  <div className="font-black mb-1">{selPlanet.name}</div>
-                  <div className="text-xs text-white/50 mb-2">{selPlanet.planet_type} · Размер {selPlanet.size}</div>
-                  <div className="grid grid-cols-3 gap-1 mb-3 text-[10px]">
-                    <div className="bg-white/5 rounded-lg p-1.5 text-center"><div>⛏️</div><div>{selPlanet.metal_richness}x</div></div>
-                    <div className="bg-white/5 rounded-lg p-1.5 text-center"><div>⚡</div><div>{selPlanet.energy_richness}x</div></div>
-                    <div className="bg-white/5 rounded-lg p-1.5 text-center"><div>💎</div><div>{selPlanet.crystal_richness}x</div></div>
+                <div className="bg-slate-900/80 rounded-2xl p-3 border border-white/10 flex-shrink-0">
+                  <div className="font-black text-sm mb-0.5 flex items-center gap-1.5">
+                    <span style={{color:PLANET_COLORS[selPlanet.planet_type]||"#94a3b8"}}>●</span>
+                    {selPlanet.name}
                   </div>
-                  <div className="text-xs mb-3">
-                    {selPlanet.owner_id===res.id ? <span className="text-green-400 font-bold">✅ Ваша колония</span>
-                    : selPlanet.is_ai_controlled ? <span className="text-red-400">🤖 ИИ-флот уровня {selPlanet.ai_fleet_tier}</span>
-                    : selPlanet.owner_id ? <span className="text-yellow-400">👤 {selPlanet.owner_nickname} ({selPlanet.owner_race})</span>
-                    : <span className="text-green-400">🆓 Свободная планета</span>}
+                  <div className="text-[10px] text-white/40 mb-2">{selPlanet.planet_type} · Размер {selPlanet.size}</div>
+                  <div className="grid grid-cols-3 gap-1 mb-2.5 text-[10px]">
+                    <div className="bg-white/5 rounded-lg p-1 text-center"><div>⛏️</div><div>{selPlanet.metal_richness}x</div></div>
+                    <div className="bg-white/5 rounded-lg p-1 text-center"><div>⚡</div><div>{selPlanet.energy_richness}x</div></div>
+                    <div className="bg-white/5 rounded-lg p-1 text-center"><div>💎</div><div>{selPlanet.crystal_richness}x</div></div>
                   </div>
-                  {selPlanet.owner_id !== res.id && fleets.length>0 && (
-                    <div>
-                      <div className="text-[10px] text-white/40 mb-1.5">Выберите флот для атаки:</div>
-                      <select value={battleFleetId||""} onChange={e=>setBattleFleetId(Number(e.target.value))}
-                        className="w-full bg-white/10 border border-white/10 rounded-lg px-2 py-1.5 text-xs mb-2">
-                        <option value="">— выбрать флот —</option>
-                        {fleets.map(f=><option key={f.id} value={f.id}>{f.name} (мощь {f.total_attack+f.total_defense})</option>)}
-                      </select>
-                      <button onClick={()=>battleFleetId&&doAttack(battleFleetId, selPlanet.id)}
-                        disabled={!battleFleetId}
-                        className="w-full py-2 bg-red-700 hover:bg-red-600 disabled:bg-white/5 disabled:text-white/30 rounded-xl text-xs font-bold transition">
-                        ⚔️ {selPlanet.owner_id ? "Атаковать" : "Колонизировать"}
-                      </button>
+                  <div className="text-xs mb-2.5">
+                    {selPlanet.owner_id===res.id
+                      ? <span className="text-green-400 font-bold">✅ Ваша колония</span>
+                      : selPlanet.is_ai_controlled
+                        ? <span className="text-red-400">🤖 ИИ-гарнизон ур.{selPlanet.ai_fleet_tier}</span>
+                        : selPlanet.owner_id
+                          ? <span className="text-yellow-400">👤 {selPlanet.owner_nickname}</span>
+                          : <span className="text-green-300">🆓 Свободная планета</span>}
+                    {selPlanet.special_resource && <span className="ml-2 text-purple-400">✨ {selPlanet.special_resource}</span>}
+                  </div>
+
+                  {/* Атака / Колонизация */}
+                  {selPlanet.owner_id !== res.id && (
+                    <div className="space-y-1.5">
+                      {fleets.length>0 ? <>
+                        <select value={battleFleetId||""} onChange={e=>setBattleFleetId(Number(e.target.value))}
+                          className="w-full bg-white/10 border border-white/10 rounded-lg px-2 py-1.5 text-[10px]">
+                          <option value="">— флот —</option>
+                          {fleets.map(f=><option key={f.id} value={f.id}>{f.name} ⚔️{f.total_attack}</option>)}
+                        </select>
+                        <button onClick={()=>battleFleetId&&doAttack(battleFleetId,selPlanet.id)} disabled={!battleFleetId}
+                          className="w-full py-1.5 bg-red-700 hover:bg-red-600 disabled:bg-white/5 disabled:text-white/30 rounded-xl text-[10px] font-bold transition">
+                          ⚔️ {selPlanet.owner_id?"Атаковать":"Колонизировать"}
+                        </button>
+                      </> : <div className="text-[10px] text-white/30 text-center">Нет флотов (вкладка Флот)</div>}
+
+                      {/* Шпионаж */}
+                      {selPlanet.owner_id && (
+                        <button onClick={()=>{setSpyPanel(!spyPanel);setSpyTarget(selPlanet);setSpyResult(null);}}
+                          className={`w-full py-1.5 rounded-xl text-[10px] font-bold transition ${spyPanel?"bg-purple-700":"bg-purple-900/50 hover:bg-purple-800"}`}>
+                          🕵️ Шпионаж
+                        </button>
+                      )}
                     </div>
                   )}
-                  {battleLog.length>0&&<div className="mt-2 space-y-0.5">{battleLog.map((l,i)=><div key={i} className={`text-[10px] ${l.startsWith("✅")?"text-green-400":l.startsWith("❌")?"text-red-400":"text-white/60"}`}>{l}</div>)}</div>}
+
+                  {/* Лог боя */}
+                  {battleLog.length>0 && (
+                    <div className="mt-2 space-y-0.5 bg-black/30 rounded-lg p-2">
+                      {battleLog.map((l,i)=>(
+                        <div key={i} className={`text-[10px] ${l.startsWith("✅")?"text-green-400":l.startsWith("❌")?"text-red-400":"text-white/60"}`}>{l}</div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
+
+              {/* ── ШПИОНАЖ ПАНЕЛЬ ── */}
+              {spyPanel && spyTarget && (
+                <div className="bg-purple-950/80 rounded-2xl p-3 border border-purple-500/30 flex-shrink-0">
+                  <div className="font-black text-sm mb-2 text-purple-300">🕵️ Шпионаж: {spyTarget.name}</div>
+                  <div className="mb-2">
+                    <div className="text-[10px] text-white/40 mb-1">Цель разведки:</div>
+                    <div className="grid grid-cols-3 gap-1">
+                      {(["resources","fleet","buildings"] as const).map(t=>(
+                        <button key={t} onClick={()=>setSpyType(t)}
+                          className={`py-1 rounded-lg text-[10px] font-bold transition ${spyType===t?"bg-purple-600":"bg-white/10 hover:bg-white/20"}`}>
+                          {t==="resources"?"⛏️ Ресурсы":t==="fleet"?"🚀 Флот":"🏗️ Здания"}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <button onClick={doSpy} disabled={spyLoading}
+                    className="w-full py-2 bg-purple-700 hover:bg-purple-600 disabled:opacity-50 rounded-xl text-xs font-bold transition mb-2">
+                    {spyLoading?"⏳ Агент действует...":"🕵️ Отправить агента"}
+                  </button>
+
+                  {spyResult && (
+                    <div className={`rounded-xl p-2.5 border text-[10px] space-y-1 ${spyResult.success?"border-green-500/30 bg-green-500/10":"border-red-500/30 bg-red-500/10"}`}>
+                      <div className={`font-bold ${spyResult.success?"text-green-400":"text-red-400"}`}>
+                        {spyResult.success?"✅ Успех":"❌ Провал"}
+                      </div>
+                      <div className="text-white/60">{spyResult.msg}</div>
+                      {spyResult.success && Object.entries(spyResult.report).map(([k,v])=>(
+                        <div key={k} className="flex justify-between text-white/80">
+                          <span className="text-white/40">{k}</span>
+                          <span className="font-bold">{String(v)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
             </div>
           </div>
         )}

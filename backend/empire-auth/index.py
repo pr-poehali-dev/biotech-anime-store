@@ -121,6 +121,16 @@ def handler(event: dict, context) -> dict:
                 """, (pid, race, col_id, planet[0]))
                 cur.execute(f"UPDATE {S}.empire_players SET home_planet_id=%s WHERE id=%s", (planet[0], pid))
 
+            # Стартовый флот — разведчик на домашней планете
+            if planet:
+                start_ships = {'scout': 1}
+                cur.execute(f"""
+                    INSERT INTO {S}.empire_fleets
+                      (owner_id, fleet_name, ships, total_attack, total_defense,
+                       current_planet_id, status, mission)
+                    VALUES (%s, %s, %s::jsonb, %s, %s, %s, 'orbit', 'defend')
+                """, (pid, f'Флот {nickname}', json.dumps(start_ships), 8, 5, planet[0]))
+
             conn.commit()
             return ok({'token': tok, 'player_id': pid, 'race': race, 'nickname': nickname})
 

@@ -1,0 +1,20 @@
+{
+  "tests": [
+    {
+      "name": "Get shop",
+      "method": "GET",
+      "path": "/?action=shop",
+      "expectedStatus": 200,
+      "expectedBody": {"shop": []},
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Get AI status",
+      "method": "GET",
+      "path": "/?action=ai_status",
+      "expectedStatus": 200,
+      "expectedBody": {"ai_race": {}},
+      "bodyMatcher": "partial"
+    }
+  ]
+}

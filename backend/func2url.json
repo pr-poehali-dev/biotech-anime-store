@@ -1,4 +1,7 @@
 {
+  "space-game-auth": "https://functions.poehali.dev/32fa56a2-c59d-4578-b0d8-563d38cc813d",
+  "space-ai-terminator": "https://functions.poehali.dev/503c2b2a-2234-401e-bdd4-8aebc8cafe54",
+  "space-game-state": "https://functions.poehali.dev/72cb1350-93b4-4cf8-818c-b0db327b594a",
   "game-action": "https://functions.poehali.dev/551fcb85-14ce-46ef-8cbe-838e9f8ceb49",
   "game-auth": "https://functions.poehali.dev/c3fbf9d0-51fd-42eb-866d-20288c962e16",
   "game-state": "https://functions.poehali.dev/86005bff-a1bf-4dcc-96b4-2df9ebc63e87",

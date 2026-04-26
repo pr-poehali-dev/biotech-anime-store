@@ -7,6 +7,7 @@ const API = {
   battle: "https://functions.poehali.dev/da4e2351-b1f6-48ab-b9cc-694b8f8b5ad3",
   social: "https://functions.poehali.dev/d3d9291d-49a7-490b-be7a-4a150fc6daad",
   shop:   "https://functions.poehali.dev/ae459e25-d759-47c3-890f-ad263c5d7871",
+  quests: "https://functions.poehali.dev/f27f29e2-e51e-4ed2-8058-441439fa55e4",
 };
 
 // ─── РАСЫ (заменены на оригинальные для игры) ─────────────────────────────────
@@ -23,7 +24,7 @@ const RACES = {
 };
 
 type RaceId = keyof typeof RACES;
-type TabId = "galaxy"|"colony"|"fleet"|"tech"|"battle"|"chat"|"alliance"|"diplomacy"|"trade"|"ranking"|"shop";
+type TabId = "galaxy"|"colony"|"fleet"|"tech"|"battle"|"chat"|"alliance"|"diplomacy"|"trade"|"ranking"|"shop"|"quests";
 
 // ─── ГАЛАКТИКИ РАС (секторы на карте) ─────────────────────────────────────────
 const SECTOR_STYLES: Record<string,{color:string;label:string;icon:string}> = {
@@ -144,6 +145,7 @@ interface AnimFleet { id:number; fromX:number; fromY:number; toX:number; toY:num
 interface SpyResult { success:boolean; target:string; report:Record<string,unknown>; msg:string; }
 interface ChatMsg { id:number; player_id:number; nickname:string; race:string; message:string; created_at:string; }
 interface Alliance { id:number; alliance_name:string; alliance_tag:string; emblem:string; alliance_desc:string; members_count:number; total_score:number; leader_name:string; is_recruiting:boolean; }
+interface Quest { id:string; name:string; icon:string; cat:string; desc:string; progress:number; target:number; completed:boolean; claimed:boolean; pct:number; reward:Record<string,number>; }
 
 // ─── УТИЛИТЫ ──────────────────────────────────────────────────────────────────
 async function api(url:string, opts?:{method?:string;body?:object;token?:string}) {
@@ -198,6 +200,13 @@ export default function GalacticEmpire() {
   const [battleFleetId,setBattleFleetId]=useState<number|null>(null);
   const [battleLog,setBattleLog]=useState<string[]>([]);
   const [buildMsg,setBuildMsg]=useState("");
+
+  // ── ЕЖЕДНЕВНЫЕ ЗАДАНИЯ ────────────────────────────────────────────────────
+  const [quests,       setQuests]       = useState<Quest[]>([]);
+  const [questsStreak, setQuestsStreak] = useState(0);
+  const [questsMsg,    setQuestsMsg]    = useState("");
+  const [questsDone,   setQuestsDone]   = useState(0);
+  const [newQuestBadge,setNewQuestBadge]= useState(false);
 
   // ── ТУТОРИАЛ ──────────────────────────────────────────────────────────────
   const [tutStep, setTutStep] = useState<number>(() => {
@@ -452,6 +461,45 @@ export default function GalacticEmpire() {
     api(`${API.social}?action=players_list`, {token}).then(d => { if (d.players) setDiploPlayers(d.players); });
     api(`${API.social}?action=my_diplomacy`, {token}).then(d => { if (d.relations) setDiploRels(d.relations); });
   }, [phase, tab]);
+
+  // ── ЗАГРУЗКА КВЕСТОВ ─────────────────────────────────────────────────────
+  const loadQuests = useCallback(() => {
+    api(`${API.quests}?action=my_quests`, {token}).then(d => {
+      if (d.quests) {
+        setQuests(d.quests);
+        setQuestsStreak(d.streak||0);
+        setQuestsDone(d.completed_today||0);
+        const unclaimed = d.quests.filter((q:Quest)=>q.completed && !q.claimed).length;
+        setNewQuestBadge(unclaimed > 0);
+      }
+    });
+  }, [token]);
+
+  useEffect(() => {
+    if (phase!=="game") return;
+    loadQuests(); // Загружаем при входе в игру чтобы показать badge
+  }, [phase]);
+
+  useEffect(() => {
+    if (phase!=="game" || tab!=="quests") return;
+    loadQuests();
+  }, [phase, tab]);
+
+  // ── ЗАБРАТЬ НАГРАДУ ───────────────────────────────────────────────────────
+  async function claimQuest(quest_id:string) {
+    setQuestsMsg("");
+    const d = await api(API.quests, {method:"POST", token, body:{action:"claim", quest_id}});
+    if (d.error) { setQuestsMsg("❌ "+d.error); return; }
+    setQuestsMsg("✅ "+d.message);
+    if (d.reward) setPlayer(p=>p?{...p,
+      metal:       (p.metal||0)       + (d.reward.metal||0),
+      energy:      (p.energy||0)      + (d.reward.energy||0),
+      crystals:    (p.crystals||0)    + (d.reward.crystals||0),
+      fuel:        (p.fuel||0)        + (d.reward.fuel||0),
+      dark_matter: (p.dark_matter||0) + (d.reward.dark_matter||0),
+    }:p);
+    loadQuests();
+  }
 
   // ── КУПИТЬ ПАКЕТ ─────────────────────────────────────────────────────────
   async function buyPackage(pkg_id:string) {
@@ -714,6 +762,7 @@ export default function GalacticEmpire() {
     {id:"diplomacy", label:"Дипломатия",icon:"🤝"},
     {id:"ranking",   label:"Рейтинг",   icon:"🏆"},
     {id:"shop",      label:"Магазин",   icon:"💎"},
+    {id:"quests",    label:"Задания",   icon:"📋"},
   ];
 
   const res = player!;
@@ -766,10 +815,13 @@ export default function GalacticEmpire() {
         <div className="max-w-7xl mx-auto flex overflow-x-auto">
           {TABS.map(t=>(
             <button key={t.id} onClick={()=>setTab(t.id)}
-              className={`flex-shrink-0 flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold whitespace-nowrap border-b-2 transition-all ${
+              className={`flex-shrink-0 flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold whitespace-nowrap border-b-2 transition-all relative ${
                 tab===t.id ? "border-blue-400 text-white bg-white/10" : "border-transparent text-white/50 hover:text-white hover:bg-white/5"
               }`}>
               {t.icon} {t.label}
+              {t.id==="quests" && newQuestBadge && (
+                <span className="absolute top-1.5 right-1 w-2 h-2 bg-yellow-400 rounded-full animate-pulse"/>
+              )}
             </button>
           ))}
         </div>
@@ -1555,6 +1607,140 @@ export default function GalacticEmpire() {
                   <div className="text-xs text-white/40 truncate">{p.alliance||"—"}</div>
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* ═══════════════ ЗАДАНИЯ ═══════════════ */}
+        {tab==="quests" && (
+          <div>
+            {/* Шапка */}
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+              <div>
+                <h2 className="font-black text-xl">📋 Ежедневные задания</h2>
+                <p className="text-xs text-white/40 mt-0.5">Обновляются каждый день в 00:00 · 5 заданий в день</p>
+              </div>
+              <div className="flex items-center gap-3">
+                {questsStreak > 0 && (
+                  <div className="bg-orange-500/20 border border-orange-500/30 rounded-2xl px-4 py-2 text-center">
+                    <div className="text-xl">🔥</div>
+                    <div className="font-black text-sm text-orange-300">{questsStreak}</div>
+                    <div className="text-[9px] text-white/40">дней подряд</div>
+                  </div>
+                )}
+                <div className="bg-white/5 border border-white/10 rounded-2xl px-4 py-2 text-center">
+                  <div className="font-black text-xl text-yellow-400">{questsDone}<span className="text-white/30 text-sm">/5</span></div>
+                  <div className="text-[9px] text-white/40">выполнено</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Сообщение */}
+            {questsMsg && (
+              <div className={`mb-4 px-4 py-2.5 rounded-2xl text-sm ${questsMsg.startsWith("✅")?"bg-green-500/20 text-green-300":"bg-red-500/20 text-red-300"}`}>
+                {questsMsg}
+              </div>
+            )}
+
+            {/* Список заданий */}
+            {quests.length === 0 ? (
+              <div className="text-center text-white/30 py-16">
+                <div className="text-5xl mb-3">⏳</div>
+                <div>Загрузка заданий...</div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                {quests.map(q => {
+                  const catColors: Record<string,string> = {
+                    battle:    "from-red-900/60 border-red-500/20",
+                    economy:   "from-yellow-900/60 border-yellow-500/20",
+                    expansion: "from-green-900/60 border-green-500/20",
+                    social:    "from-blue-900/60 border-blue-500/20",
+                  };
+                  const catColor = catColors[q.cat] || "from-slate-800/60 border-white/10";
+                  return (
+                    <div key={q.id} className={`bg-gradient-to-br ${catColor} rounded-2xl border overflow-hidden transition-all ${q.completed && !q.claimed ? "ring-2 ring-yellow-500/40" : ""}`}>
+                      <div className="p-4">
+                        {/* Заголовок */}
+                        <div className="flex items-start justify-between gap-2 mb-3">
+                          <div className="flex items-center gap-2.5">
+                            <span className="text-2xl">{q.icon}</span>
+                            <div>
+                              <div className="font-black text-sm leading-tight">{q.name}</div>
+                              <div className="text-[10px] text-white/50 mt-0.5">{q.desc}</div>
+                            </div>
+                          </div>
+                          {q.claimed && <span className="flex-shrink-0 text-[10px] bg-green-500/20 text-green-400 px-2 py-0.5 rounded-full border border-green-500/20 font-bold">✅ Получено</span>}
+                          {q.completed && !q.claimed && <span className="flex-shrink-0 text-[10px] bg-yellow-500/20 text-yellow-300 px-2 py-0.5 rounded-full border border-yellow-500/30 font-bold animate-pulse">🎁 Готово!</span>}
+                        </div>
+
+                        {/* Прогресс-бар */}
+                        <div className="mb-3">
+                          <div className="flex justify-between text-[10px] text-white/40 mb-1">
+                            <span>Прогресс</span>
+                            <span className="font-bold text-white/60">{q.progress}/{q.target}</span>
+                          </div>
+                          <div className="w-full bg-black/30 rounded-full h-2">
+                            <div
+                              className={`h-2 rounded-full transition-all duration-500 ${q.completed?"bg-gradient-to-r from-yellow-500 to-green-500":"bg-gradient-to-r from-blue-600 to-blue-400"}`}
+                              style={{width:`${q.pct}%`}}
+                            />
+                          </div>
+                        </div>
+
+                        {/* Награда */}
+                        <div className="flex flex-wrap gap-1.5 mb-3">
+                          {Object.entries(q.reward).filter(([,v])=>v>0).map(([res,val])=>(
+                            <div key={res} className="bg-black/30 rounded-lg px-2 py-0.5 text-[10px] flex items-center gap-1">
+                              <span>{resIcon(res)}</span>
+                              <span className="font-bold text-white/80">+{val}</span>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Кнопка */}
+                        {!q.claimed && (
+                          <button
+                            onClick={() => q.completed && claimQuest(q.id)}
+                            disabled={!q.completed}
+                            className={`w-full py-2 rounded-xl text-xs font-bold transition-all ${
+                              q.completed
+                                ? "bg-gradient-to-r from-yellow-600 to-amber-500 hover:from-yellow-500 hover:to-amber-400 shadow-lg shadow-yellow-500/20"
+                                : "bg-white/5 text-white/25 cursor-not-allowed"
+                            }`}
+                          >
+                            {q.completed ? "🎁 Забрать награду" : `⏳ ${q.pct}% выполнено`}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Бонус за все 5 заданий */}
+            {questsDone === 5 && (
+              <div className="mt-4 bg-gradient-to-r from-yellow-900/40 to-amber-900/40 rounded-2xl border border-yellow-500/30 p-4 flex items-center gap-4">
+                <span className="text-4xl">👑</span>
+                <div>
+                  <div className="font-black text-yellow-300">Все задания выполнены!</div>
+                  <div className="text-xs text-white/50">Серия дней: 🔥{questsStreak} · Завтра тебя ждут новые задания</div>
+                </div>
+              </div>
+            )}
+
+            {/* Подсказка как получить прогресс */}
+            <div className="mt-4 bg-white/3 rounded-2xl border border-white/10 p-4 text-xs text-white/40">
+              <div className="font-semibold text-white/60 mb-2">💡 Как выполнять задания:</div>
+              <div className="grid grid-cols-2 gap-1.5">
+                <div>⚔️ Битвы — вкладка Галактика, атакуй планеты</div>
+                <div>🏗️ Постройки — вкладка Колонии → Управлять</div>
+                <div>🔬 Исследования — вкладка Технологии</div>
+                <div>💱 Торговля — вкладка Торговля</div>
+                <div>🪐 Колонизация — свободная планета на карте</div>
+                <div>💬 Чат — вкладка Чат, напиши сообщение</div>
+              </div>
             </div>
           </div>
         )}

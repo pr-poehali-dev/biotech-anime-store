@@ -41,6 +41,9 @@ SHIPS = {
     'titan':      {'name':'Титан',        'atk':900, 'def':750, 'cost':{'metal':4000,'energy':1200,'crystals':1000,'dark_matter':50,'fuel':300},'speed':30},
     'carrier':    {'name':'Авианосец',    'atk':200, 'def':350, 'cost':{'metal':2000,'energy':800,'crystals':500,'fuel':200},'speed':60},
     'stealth':    {'name':'Невидимка',    'atk':80,  'def':30,  'cost':{'metal':600,'energy':300,'crystals':200,'dark_matter':20,'fuel':50},'speed':180},
+    'miner':      {'name':'Шахтёр',       'atk':2,   'def':10,  'cost':{'metal':300,'energy':100,'fuel':30},         'speed':60,  'mining':True},
+    'drill':      {'name':'Бур',           'atk':1,   'def':5,   'cost':{'metal':200,'energy':80,'crystals':50,'fuel':20},'speed':40, 'mining':True},
+    'harvester':  {'name':'Харвестер',     'atk':3,   'def':15,  'cost':{'metal':500,'energy':200,'crystals':100,'fuel':50},'speed':30,'mining':True},
 }
 
 TECHS = {
@@ -58,6 +61,10 @@ TECHS = {
     'diplomacy':        {'name':'Дипломатия',        'cat':'special',  'max_level':3, 'base_cost':{'crystals':200,'metal':100},   'effect':'better trade rates, alliances'},
     'quantum_computing':{'name':'Квантовые вычисления','cat':'special','max_level':3, 'base_cost':{'crystals':400,'energy':300},  'effect':'all production +20%'},
     'ancient_tech':     {'name':'Технологии Предтечей','cat':'special','max_level':2, 'base_cost':{'dark_matter':50,'crystals':800,'energy':600},'effect':'unlock titan, +40% all stats'},
+    'deep_mining':      {'name':'Глубинная добыча',    'cat':'economy',  'max_level':5, 'base_cost':{'crystals':150,'metal':200},  'effect':'mining ships +25% yield per level'},
+    'drill_tech':       {'name':'Технологии бурения',  'cat':'economy',  'max_level':4, 'base_cost':{'crystals':200,'energy':100}, 'effect':'drills +40% speed per level'},
+    'automated_mining': {'name':'Автодобыча',          'cat':'economy',  'max_level':3, 'base_cost':{'crystals':400,'metal':500},  'effect':'mining ships auto-harvest every hour'},
+    'dark_matter_drive':{'name':'Двигатель тёмной материи','cat':'military','max_level':3,'base_cost':{'dark_matter':20,'crystals':300},'effect':'all ships speed +50%'},
 }
 
 def db():
@@ -426,6 +433,94 @@ def handler(event: dict, context) -> dict:
         # ── КАТАЛОГ КОРАБЛЕЙ И ЗДАНИЙ ───────────────────────────────────────────
         if action == 'catalog':
             return ok({'ships': SHIPS, 'buildings': BUILDINGS, 'techs': TECHS})
+
+        # ── КОЛОНИЗАЦИЯ ПЛАНЕТЫ ─────────────────────────────────────────────────
+        if action == 'colonize' and method == 'POST':
+            if not player:
+                return err('Не авторизован', 401)
+            fleet_id  = body.get('fleet_id')
+            planet_id = body.get('planet_id')
+            if not fleet_id or not planet_id:
+                return err('Укажите fleet_id и planet_id')
+
+            # Проверить флот
+            cur.execute(f"SELECT id, ships, current_planet_id, status FROM {S}.empire_fleets WHERE id=%s AND owner_id=%s", (fleet_id, player['id']))
+            fleet = cur.fetchone()
+            if not fleet:
+                return err('Флот не найден')
+
+            # Проверить планету
+            cur.execute(f"SELECT id, owner_id, is_ai_controlled, ai_fleet_tier, ai_ships, name FROM {S}.empire_planets WHERE id=%s", (planet_id,))
+            planet = cur.fetchone()
+            if not planet:
+                return err('Планета не найдена', 404)
+            if planet[1] is not None:
+                return err('Планета уже занята')
+
+            # Нужно иметь технологию колонизации
+            cur.execute(f"SELECT level FROM {S}.empire_techs WHERE player_id=%s AND tech_id='colonization'", (player['id'],))
+            col_tech = cur.fetchone()
+
+            # Колонизировать
+            cur.execute(f"""
+                INSERT INTO {S}.empire_colonies
+                  (player_id, planet_id, colony_name, is_capital, mine_level, solar_level)
+                VALUES (%s,%s,%s,false,1,1) RETURNING id
+            """, (player['id'], planet_id, f'Колония на {planet[5]}'))
+            colony_id = cur.fetchone()[0]
+
+            cur.execute(f"UPDATE {S}.empire_planets SET owner_id=%s, owner_race=%s, colony_id=%s WHERE id=%s",
+                        (player['id'], player['race'], colony_id, planet_id))
+            cur.execute(f"UPDATE {S}.empire_players SET colonies_count=colonies_count+1 WHERE id=%s", (player['id'],))
+            cur.execute(f"UPDATE {S}.empire_fleets SET status='orbit', current_planet_id=%s WHERE id=%s", (planet_id, fleet_id))
+            conn.commit()
+            return ok({'colonized': True, 'colony_id': colony_id, 'planet': planet[5]})
+
+        # ── ДОБЫЧА РЕСУРСОВ КОРАБЛЯМИ ───────────────────────────────────────────
+        if action == 'mine_resources' and method == 'POST':
+            if not player:
+                return err('Не авторизован', 401)
+            fleet_id  = body.get('fleet_id')
+            planet_id = body.get('planet_id')
+            if not fleet_id or not planet_id:
+                return err('Укажите fleet_id и planet_id')
+
+            cur.execute(f"SELECT ships, current_planet_id FROM {S}.empire_fleets WHERE id=%s AND owner_id=%s", (fleet_id, player['id']))
+            fleet = cur.fetchone()
+            if not fleet:
+                return err('Флот не найден')
+            ships = fleet[0] or {}
+
+            cur.execute(f"SELECT metal_richness, energy_richness, crystal_richness FROM {S}.empire_planets WHERE id=%s", (planet_id,))
+            planet = cur.fetchone()
+            if not planet:
+                return err('Планета не найдена')
+
+            miners    = ships.get('miner', 0)
+            drills    = ships.get('drill', 0)
+            harvesters= ships.get('harvester', 0)
+            total_miners = miners + drills + harvesters
+
+            if total_miners == 0:
+                return err('Нет добывающих кораблей в флоте')
+
+            # Технологии
+            cur.execute(f"SELECT tech_id, level FROM {S}.empire_techs WHERE player_id=%s AND tech_id IN ('deep_mining','drill_tech','automated_mining')", (player['id'],))
+            tech_map = {r[0]: r[1] for r in cur.fetchall()}
+
+            base_yield = 50
+            tech_bonus = 1.0 + tech_map.get('deep_mining', 0) * 0.25 + tech_map.get('drill_tech', 0) * 0.15
+
+            metal    = int(miners    * base_yield * float(planet[0]) * tech_bonus)
+            energy   = int(drills    * base_yield * float(planet[1]) * tech_bonus)
+            crystals = int(harvesters* base_yield * float(planet[2]) * tech_bonus)
+
+            cur.execute(f"""
+                UPDATE {S}.empire_players SET metal=metal+%s, energy=energy+%s, crystals=crystals+%s WHERE id=%s
+            """, (metal, energy, crystals, player['id']))
+            conn.commit()
+            return ok({'mined': True, 'metal': metal, 'energy': energy, 'crystals': crystals,
+                       'ships_used': {'miners': miners, 'drills': drills, 'harvesters': harvesters}})
 
         return err('Неизвестное действие', 404)
 

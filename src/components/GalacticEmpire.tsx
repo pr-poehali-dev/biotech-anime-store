@@ -6,6 +6,7 @@ const API = {
   game:   "https://functions.poehali.dev/14999aad-e665-4e7b-b72f-1213f45c0727",
   battle: "https://functions.poehali.dev/da4e2351-b1f6-48ab-b9cc-694b8f8b5ad3",
   social: "https://functions.poehali.dev/d3d9291d-49a7-490b-be7a-4a150fc6daad",
+  shop:   "https://functions.poehali.dev/ae459e25-d759-47c3-890f-ad263c5d7871",
 };
 
 // ─── РАСЫ (заменены на оригинальные для игры) ─────────────────────────────────
@@ -22,7 +23,35 @@ const RACES = {
 };
 
 type RaceId = keyof typeof RACES;
-type TabId = "galaxy"|"colony"|"fleet"|"tech"|"battle"|"chat"|"alliance"|"diplomacy"|"trade"|"ranking";
+type TabId = "galaxy"|"colony"|"fleet"|"tech"|"battle"|"chat"|"alliance"|"diplomacy"|"trade"|"ranking"|"shop";
+
+// ─── ГАЛАКТИКИ РАС (секторы на карте) ─────────────────────────────────────────
+const SECTOR_STYLES: Record<string,{color:string;label:string;icon:string}> = {
+  core:         { color:"#a78bfa", label:"Ядро ИИ",          icon:"🤖" },
+  solarians:    { color:"#f59e0b", label:"Галактика Солярин", icon:"☀️" },
+  voidstalkers: { color:"#8b5cf6", label:"Тёмная Бездна",    icon:"🌑" },
+  ironborn:     { color:"#6b7280", label:"Кузница Железа",   icon:"⚙️" },
+  arboreals:    { color:"#10b981", label:"Лесной Мир",       icon:"🌿" },
+  deepones:     { color:"#06b6d4", label:"Глубины Океана",   icon:"🐙" },
+  wraithkin:    { color:"#f1f5f9", label:"Призрачная Мгла",  icon:"👻" },
+  psionic:      { color:"#ec4899", label:"Разум Пустоты",    icon:"🔮" },
+  hiveborn:     { color:"#eab308", label:"Рой Улья",         icon:"🐝" },
+  titanforge:   { color:"#ef4444", label:"Ядро Титанов",     icon:"🔥" },
+  alpha:        { color:"#60a5fa", label:"Сектор Альфа",     icon:"⭐" },
+  beta:         { color:"#34d399", label:"Сектор Бета",      icon:"⭐" },
+  gamma:        { color:"#fb923c", label:"Сектор Гамма",     icon:"⭐" },
+};
+
+// ─── ДОБЫВАЮЩИЕ КОРАБЛИ ───────────────────────────────────────────────────────
+const MINING_SHIPS: Record<string,{name:string;icon:string;desc:string;mines:string}> = {
+  miner:     { name:"Шахтёр",   icon:"⛏️", desc:"Добывает металл с планет",   mines:"metal"    },
+  drill:     { name:"Бур",      icon:"🔩", desc:"Добывает кристаллы из недр", mines:"crystals" },
+  harvester: { name:"Харвестер",icon:"🌾", desc:"Собирает энергию из звёзд",  mines:"energy"   },
+};
+
+// ─── МАГАЗИН ПАКЕТЫ ───────────────────────────────────────────────────────────
+interface ShopPackage { id:string; name:string; price_rub:number; icon:string; desc:string; rewards:Record<string,number>; bonus_score:number; }
+interface DiplomacyRel { id:number; from_id:number; to_id:number; type:string; message:string; from_nick:string; to_nick:string; date:string; }
 
 // ─── ЗДАНИЯ ───────────────────────────────────────────────────────────────────
 const BUILDINGS: Record<string,{name:string;icon:string;maxLvl:number;desc:string}> = {
@@ -61,10 +90,14 @@ const TECHS: Record<string,{name:string;icon:string;cat:string;maxLvl:number;eff
   diplomacy:         { name:"Дипломатия",            icon:"🤝", cat:"special",   maxLvl:3, effect:"Торговые маршруты, союзы" },
   quantum_computing: { name:"Квантовые вычисления",  icon:"💻", cat:"special",   maxLvl:2, effect:"Все расчёты +30% эффективность" },
   ancient_tech:      { name:"Технологии Древних",    icon:"🏛️", cat:"special",   maxLvl:1, effect:"Разблокирует артефакты и реликвии" },
+  deep_mining:       { name:"Глубинная добыча",      icon:"⛏️", cat:"economy",   maxLvl:5, effect:"Добывающие корабли +25%/ур." },
+  drill_tech:        { name:"Технологии бурения",    icon:"🔩", cat:"economy",   maxLvl:4, effect:"Буры +40% скорость/ур." },
+  automated_mining:  { name:"Автодобыча",            icon:"🤖", cat:"economy",   maxLvl:3, effect:"Автоматическая добыча каждый час" },
+  dark_matter_drive: { name:"Двигатель тёмной материи",icon:"🌑",cat:"military", maxLvl:3, effect:"Скорость всех кораблей +50%/ур." },
 };
 
 // ─── КОРАБЛИ ──────────────────────────────────────────────────────────────────
-const SHIPS: Record<string,{name:string;icon:string;atk:number;def:number;speed:number}> = {
+const SHIPS: Record<string,{name:string;icon:string;atk:number;def:number;speed:number;mining?:boolean}> = {
   scout:       { name:"Разведчик",   icon:"🛸", atk:8,   def:5,   speed:150 },
   fighter:     { name:"Истребитель", icon:"✈️", atk:20,  def:15,  speed:120 },
   cruiser:     { name:"Крейсер",     icon:"🚀", atk:55,  def:45,  speed:90  },
@@ -73,6 +106,9 @@ const SHIPS: Record<string,{name:string;icon:string;atk:number;def:number;speed:
   titan:       { name:"Титан",       icon:"🔱", atk:900, def:750, speed:30  },
   carrier:     { name:"Авианосец",   icon:"🛥️", atk:200, def:350, speed:60  },
   stealth:     { name:"Невидимка",   icon:"👁️", atk:80,  def:30,  speed:180 },
+  miner:       { name:"Шахтёр",      icon:"⛏️", atk:2,   def:10,  speed:60,  mining:true },
+  drill:       { name:"Бур",         icon:"🔩", atk:1,   def:5,   speed:40,  mining:true },
+  harvester:   { name:"Харвестер",   icon:"🌾", atk:3,   def:15,  speed:30,  mining:true },
 };
 
 // ─── ЗВЁЗДЫ ───────────────────────────────────────────────────────────────────
@@ -162,6 +198,23 @@ export default function GalacticEmpire() {
   const [battleFleetId,setBattleFleetId]=useState<number|null>(null);
   const [battleLog,setBattleLog]=useState<string[]>([]);
   const [buildMsg,setBuildMsg]=useState("");
+
+  // ── МАГАЗИН ───────────────────────────────────────────────────────────────
+  const [shopPackages, setShopPackages] = useState<ShopPackage[]>([]);
+  const [shopMsg,      setShopMsg]      = useState("");
+  const [shopHistory,  setShopHistory]  = useState<{name:string;rewards:Record<string,number>;date:string}[]>([]);
+
+  // ── ДИПЛОМАТИЯ ────────────────────────────────────────────────────────────
+  const [diploPlayers,  setDiploPlayers]  = useState<{id:number;nickname:string;race:string;score:number}[]>([]);
+  const [diploRels,     setDiploRels]     = useState<DiplomacyRel[]>([]);
+  const [diploTarget,   setDiploTarget]   = useState<number|null>(null);
+  const [diploMsg,      setDiploMsg]      = useState("");
+  const [diploAction,   setDiploAction]   = useState<"war"|"trade_union"|"peace">("peace");
+
+  // ── ДОБЫЧА КОРАБЛЯМИ ──────────────────────────────────────────────────────
+  const [mineFleetId,  setMineFleetId]  = useState<number|null>(null);
+  const [minePlanetId, setMinePlanetId] = useState<number|null>(null);
+  const [mineMsg,      setMineMsg]      = useState("");
 
   // ── КАРТА: pan/zoom ────────────────────────────────────────────────────────
   const svgRef      = useRef<SVGSVGElement>(null);
@@ -375,6 +428,64 @@ export default function GalacticEmpire() {
     } else {
       setSpyResult(d);
     }
+  }
+
+  // ── ЗАГРУЗКА МАГАЗИНА ─────────────────────────────────────────────────────
+  useEffect(() => {
+    if (phase!=="game" || tab!=="shop") return;
+    api(`${API.shop}?action=catalog`).then(d => { if (d.packages) setShopPackages(d.packages); });
+    api(`${API.shop}?action=history`, {token}).then(d => { if (d.history) setShopHistory(d.history); });
+  }, [phase, tab]);
+
+  // ── ЗАГРУЗКА ДИПЛОМАТИИ ───────────────────────────────────────────────────
+  useEffect(() => {
+    if (phase!=="game" || tab!=="diplomacy") return;
+    api(`${API.social}?action=players_list`, {token}).then(d => { if (d.players) setDiploPlayers(d.players); });
+    api(`${API.social}?action=my_diplomacy`, {token}).then(d => { if (d.relations) setDiploRels(d.relations); });
+  }, [phase, tab]);
+
+  // ── КУПИТЬ ПАКЕТ ─────────────────────────────────────────────────────────
+  async function buyPackage(pkg_id:string) {
+    setShopMsg("⏳ Обработка...");
+    const d = await api(API.shop, {method:"POST", token, body:{action:"buy", package_id:pkg_id}});
+    if (d.error) { setShopMsg("❌ "+d.error); return; }
+    setShopMsg("✅ "+d.message);
+    if (d.rewards) setPlayer(p=>p?{...p,
+      metal:    (p.metal||0)    + (d.rewards.metal||0),
+      energy:   (p.energy||0)   + (d.rewards.energy||0),
+      crystals: (p.crystals||0) + (d.rewards.crystals||0),
+      fuel:     (p.fuel||0)     + (d.rewards.fuel||0),
+      dark_matter:(p.dark_matter||0)+(d.rewards.dark_matter||0),
+    }:p);
+  }
+
+  // ── КОЛОНИЗАЦИЯ ───────────────────────────────────────────────────────────
+  async function doColonize(fleet_id:number, planet_id:number) {
+    const d = await api(API.game, {method:"POST", token, body:{action:"colonize", fleet_id, planet_id}});
+    if (d.error) { setBattleLog(["❌ "+d.error]); return; }
+    setBattleLog(["✅ Планета "+d.planet+" колонизирована! Создана колония #"+d.colony_id]);
+    setPlayer(p=>p?{...p, colonies_count:(p.colonies_count||0)+1}:p);
+  }
+
+  // ── ДОБЫЧА КОРАБЛЯМИ ─────────────────────────────────────────────────────
+  async function doMine() {
+    if (!mineFleetId || !minePlanetId) return;
+    const d = await api(API.game, {method:"POST", token, body:{action:"mine_resources", fleet_id:mineFleetId, planet_id:minePlanetId}});
+    if (d.error) { setMineMsg("❌ "+d.error); return; }
+    setMineMsg(`✅ Добыто: ⛏️${d.metal} ⚡${d.energy} 💎${d.crystals}`);
+    setPlayer(p=>p?{...p, metal:(p.metal||0)+d.metal, energy:(p.energy||0)+d.energy, crystals:(p.crystals||0)+d.crystals}:p);
+  }
+
+  // ── ДИПЛОМАТИЯ: отправить ─────────────────────────────────────────────────
+  async function sendDiplo() {
+    if (!diploTarget) return;
+    const actionMap = {war:"declare_war", trade_union:"propose_trade_union", peace:"propose_peace"};
+    const d = await api(API.social, {method:"POST", token, body:{
+      action: actionMap[diploAction], target_player_id: diploTarget, message: diploMsg
+    }});
+    if (d.error) { setDiploMsg("❌ "+d.error); return; }
+    setDiploMsg(diploAction==="war"?"⚔️ Война объявлена!":diploAction==="trade_union"?"🤝 Предложение отправлено!":"🕊️ Мир предложен!");
+    api(`${API.social}?action=my_diplomacy`,{token}).then(r=>{if(r.relations)setDiploRels(r.relations);});
   }
 
   // ── AUTH ───────────────────────────────────────────────────────────────────
@@ -593,6 +704,7 @@ export default function GalacticEmpire() {
     {id:"alliance",  label:"Альянс",    icon:"🔱"},
     {id:"diplomacy", label:"Дипломатия",icon:"🤝"},
     {id:"ranking",   label:"Рейтинг",   icon:"🏆"},
+    {id:"shop",      label:"Магазин",   icon:"💎"},
   ];
 
   const res = player!;
@@ -739,21 +851,38 @@ export default function GalacticEmpire() {
                     );
                   })}
 
+                  {/* Ореолы галактик рас */}
+                  {systems.map(sys=>{
+                    const s = SECTOR_STYLES[sys.sector];
+                    if (!s) return null;
+                    const isCore = sys.sector==="core";
+                    return (
+                      <g key={`halo-${sys.id}`} style={{pointerEvents:"none"}}>
+                        <circle cx={sys.pos_x} cy={sys.pos_y} r={isCore?60:45} fill={s.color} opacity={isCore?"0.12":"0.07"}/>
+                        <circle cx={sys.pos_x} cy={sys.pos_y} r={isCore?60:45} fill="none" stroke={s.color} strokeWidth={isCore?"1.5":"0.8"} opacity={isCore?"0.5":"0.3"} strokeDasharray={isCore?"":"6 3"}/>
+                        <text x={sys.pos_x} y={sys.pos_y-(isCore?68:52)} textAnchor="middle" fill={s.color} fontSize="8" opacity="0.7" fontWeight="bold">{s.icon} {s.label}</text>
+                      </g>
+                    );
+                  })}
+
                   {/* Звёздные системы */}
                   {systems.map(sys=>{
                     const isSelected = selSystem?.id===sys.id;
                     const col = STAR_COLORS[sys.star_type] || "#f59e0b";
                     const r = (sys.star_size||5)*1.4+3;
                     const hasMine = planets.some(p=>p.star_system_id===sys.id && p.owner_id===res.id);
+                    const sectorStyle = SECTOR_STYLES[sys.sector];
                     return (
                       <g key={sys.id} onClick={()=>{ if(!didDrag.current) loadSystem(sys); }} style={{cursor:"pointer"}}>
                         {hasMine && <circle cx={sys.pos_x} cy={sys.pos_y} r={r+16} fill="none" stroke="#22c55e" strokeWidth="0.8" opacity="0.4" strokeDasharray="3 3"/>}
+                        {sys.sector==="core" && <circle cx={sys.pos_x} cy={sys.pos_y} r={r+20} fill="none" stroke="#a78bfa" strokeWidth="2" opacity="0.6" strokeDasharray="5 3"/>}
                         {isSelected && <circle cx={sys.pos_x} cy={sys.pos_y} r={r+10} fill="none" stroke={col} strokeWidth="1.5" opacity="0.6" strokeDasharray="4 2"/>}
-                        <circle cx={sys.pos_x} cy={sys.pos_y} r={r+6} fill={col} opacity="0.12"/>
+                        <circle cx={sys.pos_x} cy={sys.pos_y} r={r+6} fill={sectorStyle?.color||col} opacity="0.1"/>
+                        <circle cx={sys.pos_x} cy={sys.pos_y} r={r+6} fill={col} opacity="0.08"/>
                         <circle cx={sys.pos_x} cy={sys.pos_y} r={r} fill={col} opacity={isSelected?1:0.85}/>
                         <circle cx={sys.pos_x-r*0.3} cy={sys.pos_y-r*0.3} r={r*0.25} fill="white" opacity="0.25"/>
                         <text x={sys.pos_x} y={sys.pos_y+r+9} textAnchor="middle" fill="white" fontSize={7/mapScale+5} opacity="0.65">{sys.name}</text>
-                        <text x={sys.pos_x} y={sys.pos_y+r+17} textAnchor="middle" fill={col} fontSize={6/mapScale+4} opacity="0.45">{sys.planet_count}🪐 {sys.sector}</text>
+                        <text x={sys.pos_x} y={sys.pos_y+r+17} textAnchor="middle" fill={sectorStyle?.color||col} fontSize={6/mapScale+4} opacity="0.55">{sys.planet_count}🪐</text>
                       </g>
                     );
                   })}
@@ -852,21 +981,31 @@ export default function GalacticEmpire() {
                     {selPlanet.special_resource && <span className="ml-2 text-purple-400">✨ {selPlanet.special_resource}</span>}
                   </div>
 
-                  {/* Атака / Колонизация */}
-                  {selPlanet.owner_id !== res.id && (
-                    <div className="space-y-1.5">
-                      {fleets.length>0 ? <>
-                        <select value={battleFleetId||""} onChange={e=>setBattleFleetId(Number(e.target.value))}
-                          className="w-full bg-white/10 border border-white/10 rounded-lg px-2 py-1.5 text-[10px]">
-                          <option value="">— флот —</option>
-                          {fleets.map(f=><option key={f.id} value={f.id}>{f.name} ⚔️{f.total_attack}</option>)}
-                        </select>
+                  {/* Действия с планетой */}
+                  <div className="space-y-1.5">
+                    {fleets.length>0 ? (
+                      <select value={battleFleetId||""} onChange={e=>{setBattleFleetId(Number(e.target.value));setMineFleetId(Number(e.target.value));setMinePlanetId(selPlanet.id);}}
+                        className="w-full bg-white/10 border border-white/10 rounded-lg px-2 py-1.5 text-[10px]">
+                        <option value="">— выбрать флот —</option>
+                        {fleets.map(f=><option key={f.id} value={f.id}>{f.name} ⚔️{f.total_attack}</option>)}
+                      </select>
+                    ) : <div className="text-[10px] text-white/30 text-center bg-white/5 rounded-lg p-1.5">Нет флотов → вкладка Флот</div>}
+
+                    {selPlanet.owner_id !== res.id && <>
+                      {/* Свободная — только колонизация */}
+                      {!selPlanet.owner_id && !selPlanet.is_ai_controlled && (
+                        <button onClick={()=>battleFleetId&&doColonize(battleFleetId,selPlanet.id)} disabled={!battleFleetId}
+                          className="w-full py-1.5 bg-green-700 hover:bg-green-600 disabled:bg-white/5 disabled:text-white/30 rounded-xl text-[10px] font-bold transition">
+                          🪐 Колонизировать планету
+                        </button>
+                      )}
+                      {/* Враг или ИИ — атака */}
+                      {(selPlanet.owner_id || selPlanet.is_ai_controlled) && (
                         <button onClick={()=>battleFleetId&&doAttack(battleFleetId,selPlanet.id)} disabled={!battleFleetId}
                           className="w-full py-1.5 bg-red-700 hover:bg-red-600 disabled:bg-white/5 disabled:text-white/30 rounded-xl text-[10px] font-bold transition">
-                          ⚔️ {selPlanet.owner_id?"Атаковать":"Колонизировать"}
+                          ⚔️ Атаковать {selPlanet.is_ai_controlled?`(ИИ ур.${selPlanet.ai_fleet_tier})`:""}
                         </button>
-                      </> : <div className="text-[10px] text-white/30 text-center">Нет флотов (вкладка Флот)</div>}
-
+                      )}
                       {/* Шпионаж */}
                       {selPlanet.owner_id && (
                         <button onClick={()=>{setSpyPanel(!spyPanel);setSpyTarget(selPlanet);setSpyResult(null);}}
@@ -874,8 +1013,19 @@ export default function GalacticEmpire() {
                           🕵️ Шпионаж
                         </button>
                       )}
-                    </div>
-                  )}
+                    </>}
+
+                    {/* Добыча кораблями (на своей или свободной) */}
+                    {fleets.some(f=>Object.keys(f.ships||{}).some(s=>SHIPS[s]?.mining)) && (
+                      <div className="border-t border-white/10 pt-1.5">
+                        <button onClick={()=>{setMinePlanetId(selPlanet.id);doMine();}} disabled={!mineFleetId}
+                          className="w-full py-1.5 bg-amber-800 hover:bg-amber-700 disabled:bg-white/5 disabled:text-white/30 rounded-xl text-[10px] font-bold transition">
+                          ⛏️ Добыть ресурсы кораблями
+                        </button>
+                        {mineMsg&&<div className={`text-[10px] mt-1 ${mineMsg.startsWith("✅")?"text-green-400":"text-red-400"}`}>{mineMsg}</div>}
+                      </div>
+                    )}
+                  </div>
 
                   {/* Лог боя */}
                   {battleLog.length>0 && (
@@ -1238,27 +1388,139 @@ export default function GalacticEmpire() {
 
         {/* ═══════════════ ДИПЛОМАТИЯ ═══════════════ */}
         {tab==="diplomacy" && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* Левая — отправить предложение */}
+            <div>
+              <h2 className="font-black text-xl mb-4">🤝 Дипломатия</h2>
+              <div className="bg-white/5 rounded-2xl p-4 border border-white/10 mb-4">
+                <div className="font-bold text-sm mb-3">Выбрать действие</div>
+                <div className="grid grid-cols-3 gap-2 mb-3">
+                  {([["peace","🕊️ Мир","bg-green-700"],["trade_union","🤝 Союз","bg-blue-700"],["war","⚔️ Война","bg-red-700"]] as const).map(([a,l,c])=>(
+                    <button key={a} onClick={()=>setDiploAction(a)}
+                      className={`py-2 rounded-xl text-xs font-bold transition ${diploAction===a?c:"bg-white/10 hover:bg-white/20"}`}>{l}</button>
+                  ))}
+                </div>
+                <div className="text-[10px] text-white/40 mb-1">Выбрать цель:</div>
+                <select value={diploTarget||""} onChange={e=>setDiploTarget(Number(e.target.value))}
+                  className="w-full bg-white/10 border border-white/10 rounded-xl px-3 py-2 text-sm mb-2">
+                  <option value="">— выбрать игрока —</option>
+                  {diploPlayers.filter(p=>p.id!==res.id).map(p=>(
+                    <option key={p.id} value={p.id}>{RACES[p.race as RaceId]?.icon||"👤"} {p.nickname} (⭐{p.score})</option>
+                  ))}
+                </select>
+                <input value={diploMsg.startsWith("✅")||diploMsg.startsWith("❌")||diploMsg.startsWith("⚔️")||diploMsg.startsWith("🤝")||diploMsg.startsWith("🕊️")?"":diploMsg}
+                  onChange={e=>setDiploMsg(e.target.value)}
+                  placeholder="Сообщение (необязательно)"
+                  className="w-full bg-white/10 border border-white/10 rounded-xl px-3 py-2 text-sm mb-3 focus:outline-none focus:border-blue-500"/>
+                <button onClick={sendDiplo} disabled={!diploTarget}
+                  className={`w-full py-2.5 rounded-xl font-bold text-sm disabled:opacity-40 transition ${diploAction==="war"?"bg-red-700 hover:bg-red-600":diploAction==="trade_union"?"bg-blue-700 hover:bg-blue-600":"bg-green-700 hover:bg-green-600"}`}>
+                  {diploAction==="war"?"⚔️ Объявить войну":diploAction==="trade_union"?"🤝 Предложить торговый союз":"🕊️ Предложить мир"}
+                </button>
+                {diploMsg&&(diploMsg.startsWith("✅")||diploMsg.startsWith("❌"))&&(
+                  <div className={`mt-2 text-sm px-3 py-1.5 rounded-xl ${diploMsg.startsWith("✅")?"bg-green-500/20 text-green-300":"bg-red-500/20 text-red-300"}`}>{diploMsg}</div>
+                )}
+              </div>
+
+              {/* Список игроков */}
+              <div className="font-bold text-sm mb-2 text-white/60">Игроки галактики</div>
+              <div className="space-y-1.5">
+                {diploPlayers.filter(p=>p.id!==res.id).slice(0,10).map(p=>(
+                  <div key={p.id} className="bg-white/5 rounded-xl px-3 py-2 border border-white/10 flex items-center justify-between text-sm">
+                    <div className="flex items-center gap-2">
+                      <span>{RACES[p.race as RaceId]?.icon||"👤"}</span>
+                      <span className="font-semibold">{p.nickname}</span>
+                      <span className="text-[10px] text-white/40">{p.rank}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-yellow-400 text-xs">⭐{p.score}</span>
+                      <button onClick={()=>setDiploTarget(p.id)} className="text-[10px] px-2 py-0.5 bg-white/10 hover:bg-white/20 rounded-lg transition">Выбрать</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Правая — история отношений */}
+            <div>
+              <h2 className="font-black text-xl mb-4">🏛️ Мои отношения</h2>
+              {diploRels.length===0
+                ? <div className="bg-white/5 rounded-2xl p-6 border border-white/10 text-center text-white/30"><div className="text-4xl mb-3">🕊️</div>Нет дипломатических записей</div>
+                : <div className="space-y-2">
+                  {diploRels.map(r=>{
+                    const typeMap:{[k:string]:{icon:string;label:string;color:string}} = {
+                      war:                  {icon:"⚔️",label:"Война",         color:"text-red-400   border-red-500/20   bg-red-500/5"},
+                      peace_proposed:       {icon:"🕊️",label:"Мир предложен", color:"text-green-400 border-green-500/20 bg-green-500/5"},
+                      trade_union_proposed: {icon:"🤝",label:"Союз предложен",color:"text-blue-400  border-blue-500/20  bg-blue-500/5"},
+                      accepted:             {icon:"✅",label:"Принято",        color:"text-green-400 border-green-500/20 bg-green-500/5"},
+                      rejected:             {icon:"❌",label:"Отклонено",      color:"text-red-400   border-red-500/20   bg-red-500/5"},
+                    };
+                    const t = typeMap[r.type] || {icon:"📋",label:r.type,color:"text-white/60 border-white/10 bg-white/5"};
+                    return (
+                      <div key={r.id} className={`rounded-xl p-3 border text-xs ${t.color}`}>
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="font-bold">{t.icon} {t.label}</span>
+                          <span className="text-white/30">{new Date(r.date).toLocaleDateString("ru")}</span>
+                        </div>
+                        <div className="text-white/60">{r.from_nick} → {r.to_nick}</div>
+                        {r.message&&<div className="text-white/40 italic mt-0.5">"{r.message}"</div>}
+                      </div>
+                    );
+                  })}
+                </div>}
+            </div>
+          </div>
+        )}
+
+        {/* ═══════════════ МАГАЗИН ═══════════════ */}
+        {tab==="shop" && (
           <div>
-            <h2 className="font-black text-xl mb-4">🤝 Дипломатия</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-              {[
-                {icon:"🕊️",name:"Мирный договор",desc:"Заключите перемирие с другой империей",color:"border-green-500/20 bg-green-500/5"},
-                {icon:"🤝",name:"Торговый союз",desc:"Откройте торговые маршруты и скидки",color:"border-blue-500/20 bg-blue-500/5"},
-                {icon:"⚔️",name:"Объявить войну",desc:"Начните открытый конфликт за ресурсы",color:"border-red-500/20 bg-red-500/5"},
-              ].map(d=>(
-                <div key={d.name} className={`rounded-2xl p-4 border ${d.color}`}>
-                  <div className="text-3xl mb-2">{d.icon}</div>
-                  <div className="font-black mb-1">{d.name}</div>
-                  <div className="text-xs text-white/50 mb-3">{d.desc}</div>
-                  <div className="text-xs text-white/30">Скоро · В разработке</div>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-black text-xl">💎 Галактический Магазин</h2>
+              {shopMsg&&<div className={`text-sm px-4 py-2 rounded-xl ${shopMsg.startsWith("✅")?"bg-green-500/20 text-green-300":shopMsg.startsWith("⏳")?"bg-blue-500/20 text-blue-300":"bg-red-500/20 text-red-300"}`}>{shopMsg}</div>}
+            </div>
+            <div className="bg-gradient-to-r from-purple-900/40 to-blue-900/40 rounded-2xl p-4 border border-purple-500/20 mb-4 text-sm text-white/60">
+              🎁 Поддержи развитие галактики! Все ресурсы начисляются мгновенно на твой аккаунт.
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+              {shopPackages.map(pkg=>(
+                <div key={pkg.id} className="bg-white/5 rounded-2xl border border-white/10 overflow-hidden hover:border-white/25 transition-all">
+                  <div className="bg-gradient-to-br from-purple-900/40 to-slate-900 p-4 text-center border-b border-white/10">
+                    <div className="text-4xl mb-2">{pkg.icon}</div>
+                    <div className="font-black text-sm">{pkg.name}</div>
+                    <div className="text-[10px] text-white/50 mt-0.5">{pkg.desc}</div>
+                  </div>
+                  <div className="p-3">
+                    <div className="space-y-1 mb-3">
+                      {Object.entries(pkg.rewards).filter(([,v])=>v>0).map(([res,val])=>(
+                        <div key={res} className="flex items-center justify-between text-[10px]">
+                          <span className="text-white/50">{resIcon(res)} {res}</span>
+                          <span className="font-bold text-white">+{val.toLocaleString()}</span>
+                        </div>
+                      ))}
+                      {pkg.bonus_score>0&&<div className="flex items-center justify-between text-[10px]"><span className="text-white/50">⭐ Очки</span><span className="font-bold text-yellow-400">+{pkg.bonus_score}</span></div>}
+                    </div>
+                    <button onClick={()=>buyPackage(pkg.id)}
+                      className="w-full py-2.5 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 rounded-xl text-sm font-black transition shadow-lg shadow-purple-500/20">
+                      {pkg.price_rub} ₽
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
-            <div className="bg-white/5 rounded-2xl p-6 border border-white/10 text-center text-white/30">
-              <div className="text-4xl mb-3">🏛️</div>
-              <div>Дипломатические отношения</div>
-              <div className="text-xs mt-1">Функция будет доступна в следующем обновлении</div>
-            </div>
+
+            {shopHistory.length>0&&(
+              <div className="mt-6">
+                <div className="font-bold text-sm mb-2 text-white/60">История покупок</div>
+                <div className="space-y-2">
+                  {shopHistory.map((h,i)=>(
+                    <div key={i} className="bg-white/5 rounded-xl px-4 py-2 border border-white/10 flex items-center justify-between text-xs">
+                      <span className="font-semibold">{h.name}</span>
+                      <span className="text-white/40">{new Date(h.date).toLocaleDateString("ru")}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 

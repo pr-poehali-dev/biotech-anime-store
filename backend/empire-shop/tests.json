@@ -1,0 +1,12 @@
+{
+  "tests": [
+    {
+      "name": "Get shop catalog",
+      "method": "GET",
+      "path": "/?action=catalog",
+      "expectedStatus": 200,
+      "expectedBody": {"packages": []},
+      "bodyMatcher": "partial"
+    }
+  ]
+}

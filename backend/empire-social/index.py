@@ -25,6 +25,9 @@ RACE_EMOJI = {
     'terrans': '🌍', 'zephyrians': '🌬️', 'vorath': '🔥', 'crystallids': '💎',
     'necrons': '💀', 'biotech': '🧬', 'mechanoids': '⚙️',
     'psychovores': '🧠', 'stellarians': '⭐',
+    'solarians': '☀️', 'voidstalkers': '🌑', 'ironborn': '⚙️',
+    'arboreals': '🌿', 'deepones': '🐙', 'wraithkin': '👻',
+    'psionic': '🔮', 'hiveborn': '🐝', 'titanforge': '🔥',
 }
 
 def db():
@@ -369,6 +372,97 @@ def handler(event: dict, context) -> dict:
             cur.execute(f"UPDATE {S}.empire_trade SET trade_status='completed', status='completed', buyer_id=%s WHERE id=%s", (player['id'], trade_id))
             conn.commit()
             return ok({'traded': True, 'got_resource': trade[2], 'got_amount': trade[3]})
+
+        # ── ОБЪЯВИТЬ ВОЙНУ ───────────────────────────────────────────────────────
+        if action == 'declare_war' and method == 'POST':
+            if not player:
+                return err('Не авторизован', 401)
+            target_id = body.get('target_player_id') or body.get('target_alliance_id')
+            target_type = body.get('target_type', 'player')
+            reason = body.get('reason', '')
+            if not target_id:
+                return err('Укажите цель')
+            cur.execute(f"""
+                INSERT INTO {S}.empire_diplomacy (player_id, target_id, target_type, relation_type, message, created_at)
+                VALUES (%s, %s, %s, 'war', %s, NOW())
+                ON CONFLICT (player_id, target_id, target_type) DO UPDATE SET relation_type='war', message=%s, updated_at=NOW()
+            """, (player['id'], target_id, target_type, reason, reason))
+            conn.commit()
+            return ok({'declared': True, 'type': 'war', 'target_id': target_id})
+
+        # ── ТОРГОВЫЙ СОЮЗ ────────────────────────────────────────────────────────
+        if action == 'propose_trade_union' and method == 'POST':
+            if not player:
+                return err('Не авторизован', 401)
+            target_id = body.get('target_player_id')
+            message   = body.get('message', 'Предлагаю торговый союз')
+            if not target_id:
+                return err('Укажите target_player_id')
+            cur.execute(f"""
+                INSERT INTO {S}.empire_diplomacy (player_id, target_id, target_type, relation_type, message, created_at)
+                VALUES (%s, %s, 'player', 'trade_union_proposed', %s, NOW())
+                ON CONFLICT (player_id, target_id, target_type) DO UPDATE SET relation_type='trade_union_proposed', message=%s, updated_at=NOW()
+            """, (player['id'], target_id, message, message))
+            conn.commit()
+            return ok({'proposed': True, 'type': 'trade_union', 'target_id': target_id})
+
+        # ── МИРНЫЙ ДОГОВОР ───────────────────────────────────────────────────────
+        if action == 'propose_peace' and method == 'POST':
+            if not player:
+                return err('Не авторизован', 401)
+            target_id = body.get('target_player_id')
+            message   = body.get('message', 'Предлагаю мир')
+            if not target_id:
+                return err('Укажите target_player_id')
+            cur.execute(f"""
+                INSERT INTO {S}.empire_diplomacy (player_id, target_id, target_type, relation_type, message, created_at)
+                VALUES (%s, %s, 'player', 'peace_proposed', %s, NOW())
+                ON CONFLICT (player_id, target_id, target_type) DO UPDATE SET relation_type='peace_proposed', message=%s, updated_at=NOW()
+            """, (player['id'], target_id, message, message))
+            conn.commit()
+            return ok({'proposed': True, 'type': 'peace', 'target_id': target_id})
+
+        # ── ПРИНЯТЬ/ОТКЛОНИТЬ ПРЕДЛОЖЕНИЕ ───────────────────────────────────────
+        if action == 'respond_diplomacy' and method == 'POST':
+            if not player:
+                return err('Не авторизован', 401)
+            diplo_id = body.get('diplomacy_id')
+            accept   = body.get('accept', False)
+            if not diplo_id:
+                return err('Укажите diplomacy_id')
+            new_status = 'accepted' if accept else 'rejected'
+            cur.execute(f"UPDATE {S}.empire_diplomacy SET relation_type=%s, updated_at=NOW() WHERE id=%s AND target_id=%s",
+                        (new_status, diplo_id, player['id']))
+            conn.commit()
+            return ok({'responded': True, 'status': new_status})
+
+        # ── МОИ ДИПЛОМАТИЧЕСКИЕ ОТНОШЕНИЯ ───────────────────────────────────────
+        if action == 'my_diplomacy':
+            if not player:
+                return err('Не авторизован', 401)
+            cur.execute(f"""
+                SELECT d.id, d.player_id, d.target_id, d.target_type, d.relation_type, d.message, d.created_at,
+                       p1.nickname as from_nick, p2.nickname as to_nick
+                FROM {S}.empire_diplomacy d
+                LEFT JOIN {S}.empire_players p1 ON p1.id = d.player_id
+                LEFT JOIN {S}.empire_players p2 ON p2.id = d.target_id
+                WHERE d.player_id=%s OR d.target_id=%s
+                ORDER BY d.created_at DESC LIMIT 50
+            """, (player['id'], player['id']))
+            relations = [{'id':r[0],'from_id':r[1],'to_id':r[2],'target_type':r[3],
+                         'type':r[4],'message':r[5],'date':str(r[6]),'from_nick':r[7],'to_nick':r[8]}
+                        for r in cur.fetchall()]
+            return ok({'relations': relations})
+
+        # ── СПИСОК ИГРОКОВ ДЛЯ ДИПЛОМАТИИ ──────────────────────────────────────
+        if action == 'players_list':
+            cur.execute(f"""
+                SELECT id, nickname, race, score, rank_title, alliance_id
+                FROM {S}.empire_players ORDER BY score DESC LIMIT 50
+            """)
+            players_list = [{'id':r[0],'nickname':r[1],'race':r[2],'score':r[3],'rank':r[4],'alliance_id':r[5]}
+                           for r in cur.fetchall()]
+            return ok({'players': players_list})
 
         return err('Неизвестное действие', 404)
 

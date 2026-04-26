@@ -1,0 +1,21 @@
+{
+  "tests": [
+    {
+      "name": "Register empire player",
+      "method": "POST",
+      "path": "/",
+      "body": {"action": "register", "nickname": "EmpireTest", "login": "empire_test@test.com", "password": "test123", "race": "terrans"},
+      "expectedStatus": 200,
+      "expectedBody": {"token": "string"},
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Get leaderboard",
+      "method": "GET",
+      "path": "/?action=leaderboard",
+      "expectedStatus": 200,
+      "expectedBody": {"leaderboard": []},
+      "bodyMatcher": "partial"
+    }
+  ]
+}

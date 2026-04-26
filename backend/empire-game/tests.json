@@ -1,0 +1,20 @@
+{
+  "tests": [
+    {
+      "name": "Get galaxy map",
+      "method": "GET",
+      "path": "/?action=galaxy",
+      "expectedStatus": 200,
+      "expectedBody": {"systems": [], "planets": []},
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Get catalog",
+      "method": "GET",
+      "path": "/?action=catalog",
+      "expectedStatus": 200,
+      "expectedBody": {"ships": {}, "buildings": {}, "techs": {}},
+      "bodyMatcher": "partial"
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "tests": [
+    {
+      "name": "Battle reports unauthorized",
+      "method": "GET",
+      "path": "/?action=battle_reports",
+      "expectedStatus": 401,
+      "expectedBody": {"error": "string"},
+      "bodyMatcher": "partial"
+    }
+  ]
+}

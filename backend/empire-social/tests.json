@@ -1,0 +1,28 @@
+{
+  "tests": [
+    {
+      "name": "Get global chat",
+      "method": "GET",
+      "path": "/?action=chat_global",
+      "expectedStatus": 200,
+      "expectedBody": {"messages": []},
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Get alliances",
+      "method": "GET",
+      "path": "/?action=alliances",
+      "expectedStatus": 200,
+      "expectedBody": {"alliances": []},
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Get trade market",
+      "method": "GET",
+      "path": "/?action=trade_market",
+      "expectedStatus": 200,
+      "expectedBody": {"trades": []},
+      "bodyMatcher": "partial"
+    }
+  ]
+}

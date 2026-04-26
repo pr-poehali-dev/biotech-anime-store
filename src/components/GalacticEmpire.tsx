@@ -917,11 +917,14 @@ export default function GalacticEmpire() {
                     const s = SECTOR_STYLES[sys.sector];
                     if (!s) return null;
                     const isCore = sys.sector==="core";
-                    // Радиус ореола считаем как максимальная орбита планет в этой системе
-                    const starR = (sys.star_size||5)*1.4 + 12;
-                    const maxOrbits = sys.planet_count || 4;
-                    const maxOrbitR = starR + 26 * (maxOrbits - 1) + 13 + 10;
-                    const haloR = Math.max(isCore ? 80 : 50, maxOrbitR);
+                    // Точный радиус ореола = последняя орбита (та же формула что в рендере планет)
+                    const starR2 = (sys.star_size||5)*1.4 + 9;
+                    const GAP2 = 8;
+                    const n = sys.planet_count || 1;
+                    // Средний радиус планеты ~6px, считаем максимальную орбиту
+                    const avgPr = 6;
+                    const maxOrbitR = starR2 + (avgPr * 2 + GAP2) * n + GAP2;
+                    const haloR = Math.max(isCore ? 90 : 55, maxOrbitR + 12);
                     return (
                       <g key={`halo-${sys.id}`} style={{pointerEvents:"none"}}>
                         <circle cx={sys.pos_x} cy={sys.pos_y} r={haloR} fill={s.color} opacity={isCore?"0.08":"0.05"}/>
@@ -953,43 +956,95 @@ export default function GalacticEmpire() {
                     );
                   })}
 
-                  {/* Планеты активной системы — каждая на своём кольце */}
+                  {/* Планеты активной системы — раздельные кольца, без касания, с анимацией */}
                   {selSystem && sysDetail && (() => {
                     const pls = sysDetail.planets || [];
-                    // Звезда занимает ~(starSize*1.4+3+6)px радиуса → первая орбита дальше
-                    const starR = (selSystem.star_size||5)*1.4 + 12;
-                    // Шаг орбит: достаточно чтобы кольца не касались (планета ≤8px радиус + зазор 6px)
-                    const ORBIT_STEP = 26;
+                    if (!pls.length) return null;
+
+                    // Радиус самой звезды (визуальный)
+                    const starR = (selSystem.star_size||5)*1.4 + 9;
+                    // Зазор между краем кольца одной планеты и краем кольца следующей
+                    const GAP = 8;
+
+                    // Предварительно считаем радиус каждой планеты
+                    // size в БД — число ~50-250, нормируем в 4..10px
+                    const planetR = pls.map((p:Planet) =>
+                      Math.round(3.5 + Math.min((p.size||80) / 30, 6.5))
+                    );
+
+                    // Строим орбиты: кольцо i начинается там где кончается кольцо (i-1) + GAP
+                    // Орбитный радиус = расстояние от центра звезды до центра планеты
+                    const orbitRadii: number[] = [];
+                    let cursor = starR + GAP;
+                    for (let i = 0; i < pls.length; i++) {
+                      cursor += planetR[i]; // центр планеты
+                      orbitRadii.push(cursor);
+                      cursor += planetR[i] + GAP; // правый край + зазор до следующей
+                    }
+
+                    // Скорость вращения: внутренние быстрее (обратно пропорционально радиусу)
+                    // Период в секундах: от 18s (ближняя) до 90s (дальняя)
+                    const minR = orbitRadii[0];
+                    const maxR = orbitRadii[orbitRadii.length - 1] || minR;
+                    const periodOf = (r: number) =>
+                      minR === maxR ? 30 : 18 + ((r - minR) / (maxR - minR)) * 72;
+
+                    // Стартовые углы — равномерно разбросаны чтобы не стартовали в куче
+                    const startAngles = pls.map((_:Planet, i:number) =>
+                      (i / pls.length) * 360 - 90
+                    );
+
                     return pls.map((p:Planet, i:number) => {
-                      const orbitR = starR + ORBIT_STEP * i + ORBIT_STEP * 0.5;
-                      // Угол: 1 планета — сверху; несколько — равномерно по кругу
-                      const angle = pls.length === 1
-                        ? -Math.PI / 2
-                        : (i / pls.length) * Math.PI * 2 - Math.PI / 2;
-                      const px = selSystem.pos_x + Math.cos(angle) * orbitR;
-                      const py = selSystem.pos_y + Math.sin(angle) * orbitR;
-                      const col = PLANET_COLORS[p.planet_type] || "#94a3b8";
-                      // Размер планеты масштабируем но ограничиваем чтобы не вылезала за орбиту
-                      const pr = Math.min((p.size||50)/14 + 3, ORBIT_STEP/2 - 3);
-                      const strokeCol = p.owner_id===res.id?"#22c55e":p.is_ai_controlled?"#ef4444":p.owner_id?"#f59e0b":"none";
-                      const isSelP = selPlanet?.id===p.id;
+                      const orbitR  = orbitRadii[i];
+                      const pr      = planetR[i];
+                      const col     = PLANET_COLORS[p.planet_type] || "#94a3b8";
+                      const strokeCol = p.owner_id===res.id
+                        ? "#22c55e" : p.is_ai_controlled
+                        ? "#ef4444" : p.owner_id
+                        ? "#f59e0b" : "none";
+                      const isSelP  = selPlanet?.id===p.id;
+                      const period  = periodOf(orbitR);
+                      const cx      = selSystem.pos_x;
+                      const cy      = selSystem.pos_y;
+
                       return (
-                        <g key={p.id} onClick={e=>{e.stopPropagation();setSelPlanet(p);setSpyPanel(false);}}>
-                          {/* Орбитальное кольцо */}
-                          <circle cx={selSystem.pos_x} cy={selSystem.pos_y} r={orbitR}
-                            fill="none" stroke="white" strokeWidth="0.3" opacity="0.10"/>
-                          {/* Выделение */}
-                          {isSelP && <circle cx={px} cy={py} r={pr+5}
-                            fill="none" stroke={col} strokeWidth="1.2" strokeDasharray="3 2" opacity="0.8"/>}
-                          {/* Свечение */}
-                          <circle cx={px} cy={py} r={pr+4} fill={col} opacity="0.12"/>
-                          {/* Планета */}
-                          <circle cx={px} cy={py} r={pr}
-                            fill={col} opacity={isSelP?1:0.82}
-                            stroke={strokeCol} strokeWidth="1.5"/>
-                          {/* Блик */}
-                          <circle cx={px-pr*0.3} cy={py-pr*0.3} r={pr*0.28}
-                            fill="white" opacity="0.22"/>
+                        <g key={p.id}>
+                          {/* Орбитальное кольцо — статичное */}
+                          <circle cx={cx} cy={cy} r={orbitR}
+                            fill="none" stroke="white" strokeWidth="0.35"
+                            opacity={isSelP ? "0.22" : "0.10"}/>
+
+                          {/* Группа вращения вокруг центра звезды */}
+                          <g
+                            onClick={e=>{e.stopPropagation();setSelPlanet(p);setSpyPanel(false);}}
+                            style={{cursor:"pointer"}}>
+                            <animateTransform
+                              attributeName="transform"
+                              type="rotate"
+                              from={`${startAngles[i]} ${cx} ${cy}`}
+                              to={`${startAngles[i]+360} ${cx} ${cy}`}
+                              dur={`${period}s`}
+                              repeatCount="indefinite"/>
+
+                            {/* Выделение выбранной */}
+                            {isSelP && (
+                              <circle cx={cx} cy={cy-orbitR} r={pr+5}
+                                fill="none" stroke={col}
+                                strokeWidth="1.3" strokeDasharray="3 2" opacity="0.9"/>
+                            )}
+                            {/* Свечение */}
+                            <circle cx={cx} cy={cy-orbitR} r={pr+3.5}
+                              fill={col} opacity="0.14"/>
+                            {/* Планета */}
+                            <circle cx={cx} cy={cy-orbitR} r={pr}
+                              fill={col}
+                              opacity={isSelP ? 1 : 0.88}
+                              stroke={strokeCol}
+                              strokeWidth={strokeCol!=="none" ? "1.8" : "0"}/>
+                            {/* Блик */}
+                            <circle cx={cx-pr*0.3} cy={cy-orbitR-pr*0.3} r={pr*0.3}
+                              fill="white" opacity="0.25"/>
+                          </g>
                         </g>
                       );
                     });

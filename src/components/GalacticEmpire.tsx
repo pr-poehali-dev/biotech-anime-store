@@ -199,6 +199,15 @@ export default function GalacticEmpire() {
   const [battleLog,setBattleLog]=useState<string[]>([]);
   const [buildMsg,setBuildMsg]=useState("");
 
+  // ── ТУТОРИАЛ ──────────────────────────────────────────────────────────────
+  const [tutStep, setTutStep] = useState<number>(() => {
+    const saved = localStorage.getItem("ge_tut");
+    return saved ? parseInt(saved) : 0;
+  });
+  const [tutVisible, setTutVisible] = useState(true);
+  const closeTut = () => { setTutVisible(false); localStorage.setItem("ge_tut","done"); };
+  const nextTut = (n: number) => { setTutStep(n); localStorage.setItem("ge_tut", String(n)); };
+
   // ── МАГАЗИН ───────────────────────────────────────────────────────────────
   const [shopPackages, setShopPackages] = useState<ShopPackage[]>([]);
   const [shopMsg,      setShopMsg]      = useState("");
@@ -1551,6 +1560,146 @@ export default function GalacticEmpire() {
         )}
 
       </div>
+
+      {/* ── ТУТОРИАЛ ─────────────────────────────────────────────────────────── */}
+      {tutVisible && localStorage.getItem("ge_tut") !== "done" && (() => {
+        const steps = [
+          {
+            icon: "🌌",
+            title: "Добро пожаловать в Галактическую Империю!",
+            text: "Ты только что основал свою межзвёздную цивилизацию. Давай разберёмся, с чего начать — это займёт 1 минуту.",
+            tab: null,
+            btn: "Начать обучение →",
+          },
+          {
+            icon: "🗺️",
+            title: "Шаг 1 — Карта галактики",
+            text: "Открой вкладку «Галактика». Нажми на звёздную систему — увидишь её планеты. Тащи карту мышью чтобы перемещаться, колесо — зум.",
+            tab: "galaxy" as TabId,
+            btn: "Понятно, далее →",
+          },
+          {
+            icon: "🛸",
+            title: "Шаг 2 — Твой первый флот",
+            text: "При регистрации тебе выдан Разведчик 🛸. Открой вкладку «Флот» — он уже там. Этот корабль нужен для колонизации свободных планет.",
+            tab: "fleet" as TabId,
+            btn: "Понятно, далее →",
+          },
+          {
+            icon: "🪐",
+            title: "Шаг 3 — Первая колония",
+            text: "На карте найди свободную планету (🆓 Свободна). Выбери флот → нажми «🪐 Колонизировать». Колония начнёт производить ресурсы!",
+            tab: "galaxy" as TabId,
+            btn: "Понятно, далее →",
+          },
+          {
+            icon: "🏗️",
+            title: "Шаг 4 — Развивай колонию",
+            text: "Вкладка «Колонии» → «Управлять». Улучшай Шахту металла ⛏️ и Солнечный реактор ⚡ — это основа экономики. Чем выше уровень, тем больше ресурсов.",
+            tab: "colony" as TabId,
+            btn: "Понятно, далее →",
+          },
+          {
+            icon: "🔬",
+            title: "Шаг 5 — Исследования",
+            text: "Вкладка «Технологии». Прокачай «Колонизацию» чтобы захватывать больше планет, и «Горное дело» для добычи металла. Технологии дают постоянные бонусы.",
+            tab: "tech" as TabId,
+            btn: "Понятно, далее →",
+          },
+          {
+            icon: "⚔️",
+            title: "Шаг 6 — Сражения",
+            text: "Построй корабли на Верфи (в колонии). Атакуй планеты ИИ или других игроков прямо с карты галактики. Победа приносит ресурсы и очки рейтинга.",
+            tab: "fleet" as TabId,
+            btn: "Понятно, далее →",
+          },
+          {
+            icon: "🤝",
+            title: "Шаг 7 — Альянсы и дипломатия",
+            text: "Вступи в альянс или создай свой — вместе проще захватывать системы. В «Дипломатии» можно объявлять войны, предлагать торговые союзы и мир.",
+            tab: "alliance" as TabId,
+            btn: "Понятно, далее →",
+          },
+          {
+            icon: "🏆",
+            title: "Готов покорять галактику!",
+            text: "Ты знаешь основы. Цель — захватить как можно больше планет, прокачать технологии и стать лучшим в рейтинге галактики. Удачи, Командор!",
+            tab: null,
+            btn: "🚀 Начать игру!",
+          },
+        ];
+
+        const step = steps[tutStep] || steps[0];
+        const isLast = tutStep === steps.length - 1;
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <div className="relative w-full max-w-md bg-gradient-to-br from-slate-900 to-slate-800 rounded-3xl border border-white/20 shadow-2xl shadow-black/60 overflow-hidden">
+
+              {/* Прогресс-бар */}
+              <div className="h-1 bg-white/10">
+                <div className="h-1 bg-gradient-to-r from-blue-500 to-purple-500 transition-all duration-500"
+                  style={{width:`${((tutStep+1)/steps.length)*100}%`}}/>
+              </div>
+
+              <div className="p-6">
+                {/* Шаг */}
+                <div className="text-[10px] text-white/30 mb-3 font-semibold tracking-widest uppercase">
+                  Шаг {tutStep+1} из {steps.length}
+                </div>
+
+                {/* Иконка + заголовок */}
+                <div className="flex items-start gap-4 mb-4">
+                  <div className="text-5xl flex-shrink-0">{step.icon}</div>
+                  <div>
+                    <h3 className="font-black text-lg leading-tight mb-1">{step.title}</h3>
+                    <p className="text-sm text-white/60 leading-relaxed">{step.text}</p>
+                  </div>
+                </div>
+
+                {/* Подсветка вкладки */}
+                {step.tab && (
+                  <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl px-3 py-2 mb-4 text-xs text-blue-300 flex items-center gap-2">
+                    <span>👆</span>
+                    <span>Нажми на вкладку <strong>«{step.tab === "galaxy"?"Галактика":step.tab==="fleet"?"Флот":step.tab==="colony"?"Колонии":step.tab==="tech"?"Технологии":step.tab==="alliance"?"Альянс":"Дипломатия"}»</strong> вверху</span>
+                  </div>
+                )}
+
+                {/* Кнопки */}
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => {
+                      if (isLast) { closeTut(); }
+                      else {
+                        const next = tutStep + 1;
+                        nextTut(next);
+                        if (steps[next]?.tab) setTab(steps[next].tab!);
+                      }
+                    }}
+                    className="flex-1 py-3 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 rounded-2xl font-bold text-sm transition-all shadow-lg shadow-blue-500/20"
+                  >
+                    {step.btn}
+                  </button>
+                  <button onClick={closeTut} className="text-white/25 hover:text-white/50 text-xs transition px-2 py-2">
+                    Пропустить
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Кнопка вызова туториала */}
+      {!tutVisible && (
+        <button
+          onClick={() => { setTutVisible(true); setTutStep(0); }}
+          className="fixed bottom-4 right-4 z-40 w-10 h-10 bg-blue-600/80 hover:bg-blue-500 backdrop-blur rounded-full text-base shadow-lg shadow-blue-500/30 transition flex items-center justify-center"
+          title="Открыть обучение"
+        >
+          ?
+        </button>
+      )}
 
       <div className="bg-black/40 border-t border-white/10 text-center py-2 text-[10px] text-white/20">
         Галактическая Империя · 9 рас · Реальное время · Миллиарды миров

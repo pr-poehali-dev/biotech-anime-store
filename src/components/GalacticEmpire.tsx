@@ -551,8 +551,8 @@ export default function GalacticEmpire() {
                   );
                 })}
                 {/* Планеты активной системы */}
-                {selSystem && sysDetail && sysDetail.planets.map((p:Planet, i:number)=>{
-                  const angle = (i/(sysDetail.planets.length))*Math.PI*2;
+                {selSystem && sysDetail && (sysDetail.planets||[]).map((p:Planet, i:number)=>{
+                  const angle = (i/((sysDetail.planets||[]).length||1))*Math.PI*2;
                   const orbitR = 45 + i*22;
                   const px = selSystem.pos_x + Math.cos(angle)*orbitR;
                   const py = selSystem.pos_y + Math.sin(angle)*orbitR;
@@ -583,7 +583,7 @@ export default function GalacticEmpire() {
                   {sysDetail && (
                     <div className="space-y-1.5">
                       <div className="text-xs text-white/50 mb-2">Планеты в системе:</div>
-                      {sysDetail.planets.map((p:Planet)=>(
+                      {(sysDetail.planets||[]).map((p:Planet)=>(
                         <button key={p.id} onClick={()=>setSelPlanet(p)}
                           className={`w-full text-left px-3 py-2 rounded-xl border text-xs transition-all ${selPlanet?.id===p.id?"bg-blue-500/20 border-blue-500/40":"bg-white/5 border-white/10 hover:border-white/30"}`}>
                           <div className="flex items-center justify-between">

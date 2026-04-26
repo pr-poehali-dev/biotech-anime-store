@@ -154,7 +154,7 @@ export default function GalacticEmpire() {
   const [battleLog,setBattleLog]=useState<string[]>([]);
   const [buildMsg,setBuildMsg]=useState("");
 
-  const raceData = player ? RACES[player.race] : RACES.solarians;
+  const raceData = (player ? RACES[player.race as RaceId] : null) ?? RACES.solarians;
 
   // ── АВТО-ВХОД ──────────────────────────────────────────────────────────────
   useEffect(() => {

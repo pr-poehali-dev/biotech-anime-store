@@ -1,5 +1,5 @@
 """
-Империя Космоса — Авторизация и профиль игрока.
+Галактическая Империя — Авторизация и профиль игрока.
 POST action=register  {nickname, login, password, race}
 POST action=login     {login, password}
 GET  action=me        — профиль по токену

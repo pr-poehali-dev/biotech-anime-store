@@ -9,9 +9,10 @@ type HeaderProps = {
 };
 
 const GAMES: Array<{ id: Page; label: string; desc: string }> = [
-  { id: "game",  label: "🎮 Игра",              desc: "Мини-игра"  },
-  { id: "game2", label: "🌌 Эпоха Звёзд",       desc: "Стратегия"  },
-  { id: "game3", label: "🚀 Космич. Путешественники", desc: "Космос MMO" },
+  { id: "game",  label: "🎮 Игра",                    desc: "Мини-игра"  },
+  { id: "game2", label: "🌌 Эпоха Звёзд",             desc: "Стратегия"  },
+  { id: "game3", label: "🚀 Космич. Путешественники",  desc: "MMO"        },
+  { id: "game4", label: "🌌 Галактическая Империя",    desc: "MMO стратегия" },
 ];
 
 const GAME_IDS = GAMES.map(g => g.id);

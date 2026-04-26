@@ -1,5 +1,5 @@
 """
-Империя Космоса — Социальная система.
+Галактическая Империя — Социальная система.
 GET  action=chat_global&since=N        — глобальный чат
 GET  action=chat_alliance&since=N      — чат альянса
 POST action=chat_send {channel, message}

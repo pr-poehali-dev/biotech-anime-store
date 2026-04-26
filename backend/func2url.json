@@ -1,4 +1,8 @@
 {
+  "empire-battle": "https://functions.poehali.dev/da4e2351-b1f6-48ab-b9cc-694b8f8b5ad3",
+  "empire-social": "https://functions.poehali.dev/d3d9291d-49a7-490b-be7a-4a150fc6daad",
+  "empire-auth": "https://functions.poehali.dev/d299b187-7949-45d0-b594-2578e2b6c399",
+  "empire-game": "https://functions.poehali.dev/14999aad-e665-4e7b-b72f-1213f45c0727",
   "space-game-auth": "https://functions.poehali.dev/32fa56a2-c59d-4578-b0d8-563d38cc813d",
   "space-ai-terminator": "https://functions.poehali.dev/503c2b2a-2234-401e-bdd4-8aebc8cafe54",
   "space-game-state": "https://functions.poehali.dev/72cb1350-93b4-4cf8-818c-b0db327b594a",

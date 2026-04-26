@@ -1,5 +1,5 @@
 """
-Империя Космоса — Боевая система.
+Галактическая Империя — Боевая система.
 POST action=attack       {fleet_id, planet_id} — атаковать планету
 POST action=colonize     {fleet_id, planet_id} — колонизировать пустую планету
 GET  action=battle_reports&page=N — мои боевые отчёты

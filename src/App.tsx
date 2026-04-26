@@ -12,8 +12,9 @@ import ContactsPage from "@/components/ContactsPage";
 import ServicesPage from "@/components/ServicesPage";
 import GamePage from "@/components/GamePage";
 import Game2Page from "@/components/Game2Page";
+import StarEmpireGame from "@/components/StarEmpireGame";
 
-export type Page = "home" | "catalog" | "veterans" | "cart" | "admin" | "delivery" | "contacts" | "services" | "game" | "game2";
+export type Page = "home" | "catalog" | "veterans" | "cart" | "admin" | "delivery" | "contacts" | "services" | "game" | "game2" | "game3";
 
 export type Product = {
   id: number;
@@ -279,6 +280,7 @@ export default function App() {
       case "services": return <ServicesPage setPage={setPage} />;
       case "game": return <GamePage />;
       case "game2": return <Game2Page />;
+      case "game3": return <StarEmpireGame />;
       default: return null;
     }
   };

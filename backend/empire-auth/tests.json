@@ -1,12 +1,12 @@
 {
   "tests": [
     {
-      "name": "Register empire player",
+      "name": "Register new player (returns verify_email)",
       "method": "POST",
       "path": "/",
-      "body": {"action": "register", "nickname": "EmpireTest", "login": "empire_test@test.com", "password": "test123", "race": "terrans"},
+      "body": {"action": "register", "nickname": "TestCmd", "login": "testcmd", "email": "test@example.com", "password": "test123", "race": "terrans"},
       "expectedStatus": 200,
-      "expectedBody": {"token": "string"},
+      "expectedBody": {"status": "verify_email"},
       "bodyMatcher": "partial"
     },
     {

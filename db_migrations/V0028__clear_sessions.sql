@@ -1,0 +1,1 @@
+UPDATE t_p83915249_biotech_anime_store.empire_players SET session_token = NULL WHERE session_token IS NOT NULL;

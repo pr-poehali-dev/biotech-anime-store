@@ -1,0 +1,1 @@
+UPDATE t_p83915249_biotech_anime_store.empire_players SET account_status = 'reset', is_online = false, home_planet_id = NULL, colonies_count = 0, score = 0, rank_title = 'Новобранец', battles_won = 0, battles_lost = 0, planets_conquered = 0, total_fleet_power = 0, fleets_count = 0, alliance_id = NULL WHERE id > 0;

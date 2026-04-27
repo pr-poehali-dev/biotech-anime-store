@@ -1,0 +1,1 @@
+ALTER TABLE t_p83915249_biotech_anime_store.empire_players ADD COLUMN IF NOT EXISTS email TEXT; ALTER TABLE t_p83915249_biotech_anime_store.empire_players ADD COLUMN IF NOT EXISTS email_verified BOOLEAN NOT NULL DEFAULT false; ALTER TABLE t_p83915249_biotech_anime_store.empire_players ADD COLUMN IF NOT EXISTS account_status TEXT NOT NULL DEFAULT 'pending';

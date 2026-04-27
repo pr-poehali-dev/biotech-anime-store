@@ -1,0 +1,1 @@
+UPDATE t_p83915249_biotech_anime_store.empire_planets SET owner_id = NULL, owner_race = NULL, colony_id = NULL, is_ai_controlled = false WHERE owner_id IS NOT NULL;

@@ -164,13 +164,21 @@ function resIcon(k:string) { return k==="metal"?"⛏️":k==="energy"?"⚡":k===
 
 // ═══════════════════════════════════════════════════════════════════════════════
 export default function GalacticEmpire() {
-  const [phase,  setPhase]  = useState<"auth"|"game">("auth");
-  const [authTab,setAuthTab]= useState<"login"|"register">("login");
-  const [form,   setForm]   = useState({email:"",nickname:"",login:"",password:"",race:"solarians" as RaceId});
-  const [authErr,setAuthErr]= useState("");
-  const [loading,setLoading]= useState(false);
-  const [token,  setToken]  = useState(()=>localStorage.getItem("ge_token")||"");
-  const [player, setPlayer] = useState<Player|null>(null);
+  const [phase,     setPhase]     = useState<"auth"|"verify"|"choose_planet"|"game">("auth");
+  const [authTab,   setAuthTab]   = useState<"login"|"register">("login");
+  const [form,      setForm]      = useState({email:"",nickname:"",login:"",password:"",race:"solarians" as RaceId});
+  const [authErr,   setAuthErr]   = useState("");
+  const [loading,   setLoading]   = useState(false);
+  const [token,     setToken]     = useState(()=>localStorage.getItem("ge_token")||"");
+  const [player,    setPlayer]    = useState<Player|null>(null);
+  const [pendingPid,setPendingPid]= useState<number|null>(null);
+  const [pendingEmail,setPendingEmail]=useState("");
+  const [pendingRace,setPendingRace]=useState<RaceId>("solarians");
+  const [pendingNick,setPendingNick]=useState("");
+  const [verifyCode,setVerifyCode]= useState("");
+  const [verifyErr, setVerifyErr] = useState("");
+  const [availPlanets,setAvailPlanets]=useState<Planet[]>([]);
+  const [selStartPlanet,setSelStartPlanet]=useState<Planet|null>(null);
 
   const [tab,       setTab]       = useState<TabId>("galaxy");
   const [systems,   setSystems]   = useState<System[]>([]);
@@ -635,20 +643,70 @@ export default function GalacticEmpire() {
     setAuthErr(""); setLoading(true);
     try {
       const body = authTab==="register"
-        ? {action:"register", login:form.login, nickname:form.nickname, password:form.password, race:form.race}
+        ? {action:"register", login:form.login, nickname:form.nickname, email:form.email, password:form.password, race:form.race}
         : {action:"login", login:form.login, password:form.password};
       const d = await api(API.auth, {method:"POST", body});
       if (d.error) { setAuthErr(d.error); return; }
+
+      if (d.status === "verify_email") {
+        setPendingPid(d.player_id); setPendingEmail(d.email);
+        if (authTab==="register") { setPendingRace(form.race); setPendingNick(form.nickname); }
+        setPhase("verify");
+        return;
+      }
+      if (d.status === "choose_planet") {
+        setPendingPid(d.player_id); setPendingRace(d.race); setPendingNick(d.nickname);
+        const pl = await api(`${API.auth}?action=available_planets&race=${d.race}`, {});
+        setAvailPlanets(pl.planets || []);
+        setPhase("choose_planet");
+        return;
+      }
+
       localStorage.setItem("ge_token", d.token);
       setToken(d.token);
-      const p = authTab==="register" ? await api(`${API.auth}?action=me`,{token:d.token}) : d.player;
-      setPlayer(p); setPhase("game");
+      setPlayer(d.player);
+      setPhase("game");
     } catch { setAuthErr("Ошибка соединения"); }
+    finally { setLoading(false); }
+  }
+
+  async function handleVerifyCode() {
+    if (!pendingPid || verifyCode.length !== 6) { setVerifyErr("Введите 6-значный код"); return; }
+    setVerifyErr(""); setLoading(true);
+    try {
+      const d = await api(API.auth, {method:"POST", body:{action:"verify_email", player_id:pendingPid, code:verifyCode}});
+      if (d.error) { setVerifyErr(d.error); return; }
+      const pl = await api(`${API.auth}?action=available_planets&race=${d.race}`, {});
+      setAvailPlanets(pl.planets || []);
+      setPendingRace(d.race); setPendingNick(d.nickname);
+      setPhase("choose_planet");
+    } catch { setVerifyErr("Ошибка соединения"); }
+    finally { setLoading(false); }
+  }
+
+  async function handleResendCode() {
+    if (!pendingPid) return;
+    const d = await api(API.auth, {method:"POST", body:{action:"resend_code", player_id:pendingPid}});
+    setVerifyErr(d.message || "Код отправлен повторно");
+  }
+
+  async function handleChoosePlanet() {
+    if (!pendingPid || !selStartPlanet) { setVerifyErr("Выберите планету"); return; }
+    setVerifyErr(""); setLoading(true);
+    try {
+      const d = await api(API.auth, {method:"POST", body:{action:"choose_planet", player_id:pendingPid, planet_id:selStartPlanet.id}});
+      if (d.error) { setVerifyErr(d.error); return; }
+      localStorage.setItem("ge_token", d.token);
+      setToken(d.token);
+      setPlayer(d.player);
+      setPhase("game");
+    } catch { setVerifyErr("Ошибка соединения"); }
     finally { setLoading(false); }
   }
 
   function logout() {
     localStorage.removeItem("ge_token"); setToken(""); setPlayer(null); setPhase("auth");
+    setPendingPid(null); setVerifyCode(""); setSelStartPlanet(null);
   }
 
   // ── УЛУЧШИТЬ ЗДАНИЕ ────────────────────────────────────────────────────────
@@ -732,6 +790,99 @@ export default function GalacticEmpire() {
     if (d.error) { setTradeMsg("❌ "+d.error); return; }
     setTradeMsg("✅ Сделка совершена!"); setPlayer(p=>p?{...p,...d.resources}:p);
     api(`${API.social}?action=trade_market`,{token}).then(r=>{if(r.trades)setTradeOffers(r.trades);});
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // ЭКРАН ПОДТВЕРЖДЕНИЯ EMAIL
+  // ═══════════════════════════════════════════════════════════════════════════
+  if (phase==="verify") {
+    return (
+      <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-slate-900/80 backdrop-blur rounded-2xl p-8 border border-white/10 shadow-2xl">
+          <div className="text-center mb-6">
+            <div className="text-5xl mb-3">📧</div>
+            <h2 className="text-2xl font-black mb-2">Подтвердите email</h2>
+            <p className="text-slate-400 text-sm">
+              Мы отправили 6-значный код на<br/>
+              <span className="text-blue-400 font-semibold">{pendingEmail}</span>
+            </p>
+          </div>
+          <div className="mb-4">
+            <label className="text-xs text-slate-400 mb-2 block">Код из письма</label>
+            <input
+              value={verifyCode}
+              onChange={e=>setVerifyCode(e.target.value.replace(/\D/g,'').slice(0,6))}
+              onKeyDown={e=>e.key==="Enter"&&handleVerifyCode()}
+              placeholder="000000"
+              maxLength={6}
+              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-2xl font-black text-center tracking-[0.5em] focus:outline-none focus:border-purple-500 transition"
+            />
+          </div>
+          {verifyErr && <div className="bg-red-500/20 border border-red-500/30 text-red-300 text-sm rounded-xl px-4 py-2.5 mb-4">{verifyErr}</div>}
+          <button onClick={handleVerifyCode} disabled={loading || verifyCode.length!==6}
+            className="w-full py-3 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 rounded-xl font-bold transition disabled:opacity-50 mb-3">
+            {loading ? "⏳ Проверяем..." : "✅ Подтвердить"}
+          </button>
+          <div className="flex justify-between items-center">
+            <button onClick={handleResendCode} className="text-xs text-slate-400 hover:text-white transition">
+              Отправить код повторно
+            </button>
+            <button onClick={()=>setPhase("auth")} className="text-xs text-slate-500 hover:text-white transition">
+              ← Назад
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // ЭКРАН ВЫБОРА СТАРТОВОЙ ПЛАНЕТЫ
+  // ═══════════════════════════════════════════════════════════════════════════
+  if (phase==="choose_planet") {
+    const raceData = RACES[pendingRace] || {icon:"🌌", name:pendingRace};
+    return (
+      <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center p-4">
+        <div className="max-w-2xl w-full bg-slate-900/80 backdrop-blur rounded-2xl p-6 border border-white/10 shadow-2xl">
+          <div className="text-center mb-6">
+            <div className="text-5xl mb-2">{raceData.icon}</div>
+            <h2 className="text-2xl font-black mb-1">Выберите стартовую планету</h2>
+            <p className="text-slate-400 text-sm">
+              Командор <span className="text-purple-400 font-bold">{pendingNick}</span>,<br/>
+              выберите планету — здесь будет основана столица вашей империи.<br/>
+              В стартовый флот включён <span className="text-green-400 font-bold">корабль Колонист 🛸</span> для будущих колоний.
+            </p>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-72 overflow-y-auto mb-4">
+            {availPlanets.map(p=>(
+              <button key={p.id} onClick={()=>setSelStartPlanet(p)}
+                className={`text-left p-3 rounded-xl border transition-all ${selStartPlanet?.id===p.id?"border-purple-400 bg-purple-500/20":"border-white/10 hover:border-white/30 bg-white/5"}`}>
+                <div className="font-bold text-sm truncate">{p.name}</div>
+                <div className="text-[10px] text-white/50 mt-0.5">Сектор: {p.sector}</div>
+                <div className="flex gap-2 mt-1 text-[10px] text-white/40">
+                  {p.metal_rich && <span>⛏️Металл</span>}
+                  {p.energy_rich && <span>⚡Энергия</span>}
+                </div>
+              </button>
+            ))}
+          </div>
+          {selStartPlanet && (
+            <div className="bg-purple-500/10 border border-purple-500/30 rounded-xl p-3 mb-4 text-sm">
+              <span className="font-bold text-purple-300">Выбрана:</span> {selStartPlanet.name}
+              <span className="text-white/50 ml-2">· Сектор {selStartPlanet.sector}</span>
+            </div>
+          )}
+          {verifyErr && <div className="bg-red-500/20 border border-red-500/30 text-red-300 text-sm rounded-xl px-4 py-2.5 mb-4">{verifyErr}</div>}
+          <button onClick={handleChoosePlanet} disabled={loading || !selStartPlanet}
+            className="w-full py-3 bg-gradient-to-r from-green-700 to-emerald-600 hover:from-green-600 hover:to-emerald-500 rounded-xl font-bold transition disabled:opacity-50">
+            {loading ? "⏳ Основываем империю..." : "🪐 Основать столицу здесь!"}
+          </button>
+          <div className="mt-3 text-center">
+            <div className="text-[10px] text-white/30">Стартовый флот: 🚀 Разведчик + 🛸 Колонист</div>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   // ═══════════════════════════════════════════════════════════════════════════

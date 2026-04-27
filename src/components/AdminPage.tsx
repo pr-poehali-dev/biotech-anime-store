@@ -43,11 +43,11 @@ export default function AdminPage({ products, setProducts }: Props) {
             placeholder="Пароль"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && password === "19811981ZXCasd" && setAuth(true)}
+            onKeyDown={(e) => e.key === "Enter" && password === "567765" && setAuth(true)}
             className="w-full border border-border rounded-xl px-4 py-2.5 mb-3 text-sm outline-none focus:ring-2 focus:ring-primary/30"
           />
           <button
-            onClick={() => password === "19811981ZXCasd" ? setAuth(true) : alert("Неверный пароль")}
+            onClick={() => password === "567765" ? setAuth(true) : alert("Неверный пароль")}
             className="bear-btn w-full bg-primary text-primary-foreground font-bold py-2.5 rounded-xl"
           >
             Войти

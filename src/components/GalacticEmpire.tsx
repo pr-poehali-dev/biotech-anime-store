@@ -1309,12 +1309,14 @@ export default function GalacticEmpire() {
           <div className="flex gap-0" style={{height:"calc(100vh - 130px)"}}>
 
             {/* ── Карта ── */}
-            <div ref={mapWrapRef} className="flex-1 bg-slate-950 relative overflow-hidden select-none" style={{minHeight:0}}>
+            <div ref={mapWrapRef} className="flex-1 relative overflow-hidden select-none" style={{minHeight:0, background:"radial-gradient(ellipse at center, #06121f 0%, #030710 70%, #01030a 100%)"}}>
 
               {/* Подсказка управления */}
               <div className="absolute top-2 left-2 z-20 flex items-center gap-2 flex-wrap">
-                <div className="bg-black/60 backdrop-blur rounded-xl px-3 py-1.5 text-[10px] text-white/50 flex items-center gap-2">
-                  <span>🖱️ тащи</span><span>·</span><span>⚲ зум</span><span>·</span><span>{systems.length} систем</span>
+                <div className="sci-panel rounded px-3 py-1.5 text-[10px] sci-mono text-cyan-300/70 flex items-center gap-2 sci-corner">
+                  <span>◇ DRAG</span><span className="text-cyan-500/40">│</span>
+                  <span>◇ ZOOM</span><span className="text-cyan-500/40">│</span>
+                  <span className="text-cyan-200">{systems.length} SYS</span>
                 </div>
                 {/* Кнопка Моя колония */}
                 {res.home_planet_id && (
@@ -1329,17 +1331,17 @@ export default function GalacticEmpire() {
                       if(sys){setSelSystem(sys);setSelPlanet(homeP);}
                     }
                   }}
-                  className="bg-green-900/80 hover:bg-green-800 backdrop-blur rounded-xl px-3 py-1.5 text-[10px] text-green-300 font-bold flex items-center gap-1.5 transition">
-                    🏠 Моя колония
+                  className="sci-btn sci-btn-success rounded px-3 py-1.5 text-[10px] flex items-center gap-1.5">
+                    🏠 HOME BASE
                   </button>
                 )}
               </div>
 
               {/* Кнопки управления картой */}
               <div className="absolute top-2 right-2 z-20 flex flex-col gap-1">
-                <button onClick={()=>setMapScale(s=>Math.min(10,s*1.5))} className="w-8 h-8 bg-black/60 hover:bg-white/20 rounded-lg text-white text-base font-black flex items-center justify-center transition">+</button>
-                <button onClick={()=>setMapScale(s=>Math.max(0.1,s*0.67))} className="w-8 h-8 bg-black/60 hover:bg-white/20 rounded-lg text-white text-base font-black flex items-center justify-center transition">−</button>
-                <button onClick={resetMap} className="w-8 h-8 bg-black/60 hover:bg-white/20 rounded-lg text-white text-[10px] flex items-center justify-center transition" title="Вся галактика">🌌</button>
+                <button onClick={()=>setMapScale(s=>Math.min(10,s*1.5))} className="w-8 h-8 sci-panel hover:bg-cyan-500/15 rounded text-cyan-300 text-base font-black flex items-center justify-center transition border border-cyan-500/30">+</button>
+                <button onClick={()=>setMapScale(s=>Math.max(0.1,s*0.67))} className="w-8 h-8 sci-panel hover:bg-cyan-500/15 rounded text-cyan-300 text-base font-black flex items-center justify-center transition border border-cyan-500/30">−</button>
+                <button onClick={resetMap} className="w-8 h-8 sci-panel hover:bg-cyan-500/15 rounded text-cyan-300 text-[10px] flex items-center justify-center transition border border-cyan-500/30" title="Вся галактика">🌌</button>
                 <button onClick={async ()=>{
                   const svgEl = svgRef.current;
                   const rect = svgEl?.getBoundingClientRect();
@@ -1369,18 +1371,30 @@ export default function GalacticEmpire() {
                   } else {
                     resetMap();
                   }
-                }} className="w-8 h-8 bg-black/60 hover:bg-white/20 rounded-lg text-white text-sm flex items-center justify-center transition" title="На домашнюю планету">🏠</button>
+                }} className="w-8 h-8 sci-panel hover:bg-cyan-500/15 rounded text-cyan-300 text-sm flex items-center justify-center transition border border-cyan-500/30" title="На домашнюю планету">🏠</button>
               </div>
 
               {/* Легенда */}
-              <div className="absolute bottom-2 left-2 z-20 flex items-center gap-3 bg-black/60 backdrop-blur rounded-xl px-3 py-1.5 text-[9px] text-white/50">
-                <span><span className="text-green-400">●</span> Моя</span>
-                <span><span className="text-red-400">●</span> ИИ</span>
-                <span><span className="text-yellow-400">●</span> Игрок</span>
-                <span><span className="text-white/30">●</span> Свободна</span>
-                <span><span className="text-blue-300">➤</span> Мой флот</span>
-                <span><span className="text-red-400">➤</span> Враг</span>
+              <div className="absolute bottom-2 left-2 z-20 flex items-center gap-3 sci-panel rounded px-3 py-1.5 text-[9px] sci-mono text-cyan-300/70 sci-corner">
+                <span><span className="text-emerald-400 sci-text-glow">◆</span> ALLY</span>
+                <span><span className="text-red-400">◆</span> AI</span>
+                <span><span className="text-amber-300">◆</span> PLAYER</span>
+                <span><span className="text-cyan-300/40">◇</span> NEUTRAL</span>
+                <span><span className="text-cyan-300">▸</span> FLEET</span>
+                <span><span className="text-red-400">▸</span> HOSTILE</span>
               </div>
+
+              {/* Угловые маркеры HUD */}
+              <div className="absolute top-0 left-0 w-6 h-6 z-10 pointer-events-none border-l-2 border-t-2 border-cyan-400/50"/>
+              <div className="absolute top-0 right-0 w-6 h-6 z-10 pointer-events-none border-r-2 border-t-2 border-cyan-400/50"/>
+              <div className="absolute bottom-0 left-0 w-6 h-6 z-10 pointer-events-none border-l-2 border-b-2 border-cyan-400/50"/>
+              <div className="absolute bottom-0 right-0 w-6 h-6 z-10 pointer-events-none border-r-2 border-b-2 border-cyan-400/50"/>
+              {/* Координаты в углу */}
+              <div className="absolute top-2 left-1/2 -translate-x-1/2 z-10 pointer-events-none sci-mono text-[9px] text-cyan-400/40 tracking-widest">
+                ◤ NAVCOM ─ SECTOR MAP ─ v2.7 ◥
+              </div>
+              {/* Сканлайн радара */}
+              <div className="sci-scan-line"/>
 
               <svg
                 ref={svgRef}
@@ -1396,53 +1410,147 @@ export default function GalacticEmpire() {
               >
                 <g transform={`translate(${mapTx},${mapTy}) scale(${mapScale})`} style={{transformOrigin:"1200px 1200px"}}>
 
-                  {/* Фоновые звёзды — заполняем всё поле 2400x2400 */}
-                  {Array.from({length:600}).map((_,i)=>(
+                  {/* SVG defs для свечения и градиентов */}
+                  <defs>
+                    <radialGradient id="coreGlow" cx="50%" cy="50%" r="50%">
+                      <stop offset="0%" stopColor="#22d3ee" stopOpacity="0.18"/>
+                      <stop offset="60%" stopColor="#22d3ee" stopOpacity="0.04"/>
+                      <stop offset="100%" stopColor="#22d3ee" stopOpacity="0"/>
+                    </radialGradient>
+                    <radialGradient id="nebulaPurple" cx="50%" cy="50%" r="50%">
+                      <stop offset="0%" stopColor="#a78bfa" stopOpacity="0.12"/>
+                      <stop offset="100%" stopColor="#a78bfa" stopOpacity="0"/>
+                    </radialGradient>
+                    <radialGradient id="nebulaCyan" cx="50%" cy="50%" r="50%">
+                      <stop offset="0%" stopColor="#06b6d4" stopOpacity="0.10"/>
+                      <stop offset="100%" stopColor="#06b6d4" stopOpacity="0"/>
+                    </radialGradient>
+                    <filter id="nodeGlow" x="-50%" y="-50%" width="200%" height="200%">
+                      <feGaussianBlur stdDeviation="3" result="blur"/>
+                      <feMerge>
+                        <feMergeNode in="blur"/>
+                        <feMergeNode in="SourceGraphic"/>
+                      </feMerge>
+                    </filter>
+                  </defs>
+
+                  {/* Дальние туманности с градиентами */}
+                  <circle cx="1200" cy="1200" r="800" fill="url(#coreGlow)"/>
+                  <circle cx="400"  cy="400"  r="350" fill="url(#nebulaPurple)"/>
+                  <circle cx="2000" cy="2000" r="350" fill="url(#nebulaCyan)"/>
+                  <circle cx="2000" cy="400"  r="300" fill="url(#nebulaPurple)"/>
+                  <circle cx="400"  cy="2000" r="300" fill="url(#nebulaCyan)"/>
+
+                  {/* Координатная сетка */}
+                  {Array.from({length:13}).map((_,i)=>(
+                    <line key={`gv-${i}`}
+                      x1={i*200} y1={0} x2={i*200} y2={2400}
+                      stroke="#22d3ee" strokeWidth={i===6?"0.8":"0.3"}
+                      opacity={i===6?"0.18":"0.06"}/>
+                  ))}
+                  {Array.from({length:13}).map((_,i)=>(
+                    <line key={`gh-${i}`}
+                      x1={0} y1={i*200} x2={2400} y2={i*200}
+                      stroke="#22d3ee" strokeWidth={i===6?"0.8":"0.3"}
+                      opacity={i===6?"0.18":"0.06"}/>
+                  ))}
+
+                  {/* Координатные метки по краям */}
+                  {Array.from({length:13}).map((_,i)=>(
+                    <text key={`cx-${i}`} x={i*200} y={14} fill="#22d3ee" opacity="0.35"
+                      fontSize="10" fontFamily="JetBrains Mono, monospace" textAnchor="middle">
+                      {String(i).padStart(2,"0")}
+                    </text>
+                  ))}
+                  {Array.from({length:13}).map((_,i)=>(
+                    <text key={`cy-${i}`} x={8} y={i*200+4} fill="#22d3ee" opacity="0.35"
+                      fontSize="10" fontFamily="JetBrains Mono, monospace">
+                      {String.fromCharCode(65+i)}
+                    </text>
+                  ))}
+
+                  {/* Концентрические орбиты от центра — зоны влияния */}
+                  {[300,600,900,1200].map((r,i)=>(
+                    <circle key={`orb-${i}`} cx="1200" cy="1200" r={r}
+                      fill="none" stroke="#22d3ee" strokeWidth="0.6"
+                      strokeDasharray="4 6" opacity={0.18-i*0.03}/>
+                  ))}
+
+                  {/* Радиальные оси — компасные направления */}
+                  {[0,45,90,135].map(a=>{
+                    const rad = a*Math.PI/180;
+                    const x2 = 1200 + Math.cos(rad)*1200;
+                    const y2 = 1200 + Math.sin(rad)*1200;
+                    const x1 = 1200 - Math.cos(rad)*1200;
+                    const y1 = 1200 - Math.sin(rad)*1200;
+                    return <line key={`rad-${a}`} x1={x1} y1={y1} x2={x2} y2={y2}
+                      stroke="#22d3ee" strokeWidth="0.4" opacity="0.07"/>;
+                  })}
+
+                  {/* Метки сторон карты */}
+                  <text x="1200" y="40" fill="#22d3ee" opacity="0.5" fontSize="14" fontFamily="Orbitron, monospace" textAnchor="middle" letterSpacing="4">N</text>
+                  <text x="1200" y="2390" fill="#22d3ee" opacity="0.5" fontSize="14" fontFamily="Orbitron, monospace" textAnchor="middle" letterSpacing="4">S</text>
+                  <text x="40" y="1206" fill="#22d3ee" opacity="0.5" fontSize="14" fontFamily="Orbitron, monospace" letterSpacing="4">W</text>
+                  <text x="2360" y="1206" fill="#22d3ee" opacity="0.5" fontSize="14" fontFamily="Orbitron, monospace" letterSpacing="4">E</text>
+
+                  {/* Фоновые звёзды */}
+                  {Array.from({length:500}).map((_,i)=>(
                     <circle key={i}
                       cx={(i*479.5)%2400} cy={(i*317.3)%2400}
-                      r={(i%3===0)?1.4:(i%5===0)?0.9:0.5}
-                      fill="white" opacity={(i%4===0)?0.45:(i%3===0)?0.25:0.12}/>
+                      r={(i%3===0)?1.2:(i%5===0)?0.8:0.4}
+                      fill={(i%7===0)?"#a5f3fc":"white"} opacity={(i%4===0)?0.5:(i%3===0)?0.25:0.1}/>
                   ))}
 
-                  {/* Туманности — по всей карте */}
-                  {[
-                    {cx:1200,cy:1200,r:200,c:"#7c3aed"},{cx:200,cy:200,r:120,c:"#f59e0b"},
-                    {cx:2200,cy:200,r:120,c:"#8b5cf6"},{cx:200,cy:2200,r:120,c:"#6b7280"},
-                    {cx:2200,cy:2200,r:120,c:"#10b981"},{cx:200,cy:1200,r:100,c:"#06b6d4"},
-                    {cx:2200,cy:1200,r:100,c:"#f1f5f9"},{cx:1200,cy:200,r:100,c:"#ec4899"},
-                    {cx:1200,cy:2200,r:100,c:"#eab308"},{cx:700,cy:700,r:90,c:"#ef4444"},
-                  ].map((n,i)=>(
-                    <ellipse key={i} cx={n.cx} cy={n.cy} rx={n.r*2} ry={n.r} fill={n.c} opacity="0.05"/>
-                  ))}
-
-                  {/* Линии соединения систем одного сектора */}
+                  {/* Линии гипертрасс между системами одного сектора — неон */}
                   {systems.flatMap(a=>
                     systems.filter(b=>b.id>a.id && b.sector===a.sector).map(b=>{
                       const d=Math.hypot(b.pos_x-a.pos_x,b.pos_y-a.pos_y);
                       if(d>450) return null;
                       const s = SECTOR_STYLES[a.sector];
-                      return <line key={`${a.id}-${b.id}`} x1={a.pos_x} y1={a.pos_y} x2={b.pos_x} y2={b.pos_y}
-                        stroke={s?.color||"white"} strokeWidth="0.8" opacity={0.08+0.06*(1-d/450)}/>;
+                      const baseCol = s?.color || "#22d3ee";
+                      const opacity = 0.10+0.18*(1-d/450);
+                      return (
+                        <g key={`${a.id}-${b.id}`}>
+                          <line x1={a.pos_x} y1={a.pos_y} x2={b.pos_x} y2={b.pos_y}
+                            stroke={baseCol} strokeWidth="2.5" opacity={opacity*0.3} strokeLinecap="round"/>
+                          <line x1={a.pos_x} y1={a.pos_y} x2={b.pos_x} y2={b.pos_y}
+                            stroke={baseCol} strokeWidth="0.6" opacity={opacity} strokeDasharray="2 4"/>
+                        </g>
+                      );
                     })
                   )}
 
-                  {/* Анимированные флоты */}
+                  {/* Зоны влияния альянсов вокруг моих систем */}
+                  {systems.filter(s=>planets.some(p=>p.star_system_id===s.id && p.owner_id===res.id)).map(s=>(
+                    <g key={`infl-${s.id}`} pointerEvents="none">
+                      <circle cx={s.pos_x} cy={s.pos_y} r="80" fill="#22c55e" opacity="0.05"/>
+                      <circle cx={s.pos_x} cy={s.pos_y} r="80" fill="none" stroke="#22c55e" strokeWidth="0.5" strokeDasharray="2 4" opacity="0.4"/>
+                    </g>
+                  ))}
+
+                  {/* Анимированные флоты — неоновые трассеры */}
                   {animFleets.map(f=>{
                     const x = f.fromX + (f.toX-f.fromX)*f.progress;
                     const y = f.fromY + (f.toY-f.fromY)*f.progress;
                     const dx = f.toX-f.fromX; const dy = f.toY-f.fromY;
                     const angle = Math.atan2(dy,dx)*(180/Math.PI);
-                    const col = f.owner ? "#60a5fa" : "#f87171";
-                    const trail = 18;
+                    const col = f.owner ? "#22d3ee" : "#f87171";
+                    const trail = 28;
                     const tx = x - Math.cos(Math.atan2(dy,dx))*trail;
                     const ty = y - Math.sin(Math.atan2(dy,dx))*trail;
                     return (
                       <g key={f.id}>
-                        <line x1={tx} y1={ty} x2={x} y2={y} stroke={col} strokeWidth="1" opacity="0.35"/>
+                        {/* Полная трасса от старта до цели — пунктир */}
+                        <line x1={f.fromX} y1={f.fromY} x2={f.toX} y2={f.toY}
+                          stroke={col} strokeWidth="0.5" opacity="0.18" strokeDasharray="3 5"/>
+                        {/* Светящийся хвост */}
+                        <line x1={tx} y1={ty} x2={x} y2={y} stroke={col} strokeWidth="2.5" opacity="0.15" strokeLinecap="round"/>
+                        <line x1={tx} y1={ty} x2={x} y2={y} stroke={col} strokeWidth="0.8" opacity="0.7" strokeLinecap="round"/>
+                        {/* Стрелка корабля */}
                         <g transform={`translate(${x},${y}) rotate(${angle})`}>
-                          <polygon points="-4,2 4,0 -4,-2" fill={col} opacity="0.9"/>
+                          <polygon points="-5,2.5 5,0 -5,-2.5" fill={col} opacity="0.95" filter="url(#nodeGlow)"/>
                         </g>
-                        <circle cx={x} cy={y} r="2.5" fill={col} opacity="0.2"/>
+                        <circle cx={x} cy={y} r="3" fill={col} opacity="0.3"/>
                       </g>
                     );
                   })}
@@ -1462,38 +1570,59 @@ export default function GalacticEmpire() {
                     </g>
                   ))}
 
-                  {/* Флоты игрока на карте — с маршрутами и временем полёта */}
+                  {/* Флоты игрока на карте — навигационные маркеры Lagrange */}
                   {fleets.filter(f=>f.status==="moving" && f.pos_x && f.pos_y).map(f=>{
                     const targetP = planets.find(p=>p.id===f.target_id);
                     return (
                       <g key={`fleet-map-${f.id}`} style={{pointerEvents:"none"}}>
-                        {/* Линия маршрута */}
+                        {/* Линия маршрута — двухслойный неон */}
                         {targetP && (
-                          <line x1={f.pos_x} y1={f.pos_y} x2={targetP.pos_x} y2={targetP.pos_y}
-                            stroke="#60a5fa" strokeWidth="1" opacity="0.3" strokeDasharray="12 6"/>
+                          <>
+                            <line x1={f.pos_x} y1={f.pos_y} x2={targetP.pos_x} y2={targetP.pos_y}
+                              stroke="#22d3ee" strokeWidth="3" opacity="0.12" strokeLinecap="round"/>
+                            <line x1={f.pos_x} y1={f.pos_y} x2={targetP.pos_x} y2={targetP.pos_y}
+                              stroke="#67e8f9" strokeWidth="0.8" opacity="0.5" strokeDasharray="8 4">
+                              <animate attributeName="stroke-dashoffset" from="0" to="-24" dur="1.5s" repeatCount="indefinite"/>
+                            </line>
+                          </>
                         )}
-                        {/* Значок флота */}
-                        <circle cx={f.pos_x} cy={f.pos_y} r="8" fill="#1d4ed8" opacity="0.8"/>
-                        <circle cx={f.pos_x} cy={f.pos_y} r="8" fill="none" stroke="#60a5fa" strokeWidth="1.5">
-                          <animate attributeName="r" values="8;14;8" dur="2s" repeatCount="indefinite"/>
-                          <animate attributeName="opacity" values="0.8;0.1;0.8" dur="2s" repeatCount="indefinite"/>
+                        {/* Свечение */}
+                        <circle cx={f.pos_x} cy={f.pos_y} r="12" fill="#22d3ee" opacity="0.18"/>
+                        {/* Импульс */}
+                        <circle cx={f.pos_x} cy={f.pos_y} r="8" fill="none" stroke="#67e8f9" strokeWidth="1">
+                          <animate attributeName="r" values="8;18;8" dur="2s" repeatCount="indefinite"/>
+                          <animate attributeName="opacity" values="0.9;0;0.9" dur="2s" repeatCount="indefinite"/>
                         </circle>
-                        <text x={f.pos_x} y={f.pos_y+4} textAnchor="middle" fontSize="8">🚀</text>
-                        {/* Подпись с именем */}
+                        {/* Корпус маркера */}
+                        <circle cx={f.pos_x} cy={f.pos_y} r="6" fill="#0e7490" opacity="0.85" stroke="#22d3ee" strokeWidth="1.2"/>
+                        <text x={f.pos_x} y={f.pos_y+3} textAnchor="middle" fontSize="8">🚀</text>
+                        {/* Тех-подпись */}
                         <text x={f.pos_x} y={f.pos_y-12} textAnchor="middle"
-                          fontSize="6" fill="#93c5fd" fontWeight="bold">{f.name}</text>
+                          fontSize="6.5" fill="#67e8f9" fontFamily="JetBrains Mono, monospace" letterSpacing="0.5">▸ {f.name}</text>
                       </g>
                     );
                   })}
 
-                  {/* Мои планеты — зелёный маркер */}
+                  {/* Мои планеты — узлы фракции Lagrange */}
                   {planets.filter(p=>p.owner_id===res.id).map(p=>(
                     <g key={`myplanet-${p.id}`} style={{cursor:"pointer"}}
                       onClick={()=>{ setSelPlanet(p); const sys=systems.find(s=>s.id===p.star_system_id); if(sys)setSelSystem(sys); }}>
-                      <circle cx={p.pos_x} cy={p.pos_y} r="6" fill="#22c55e" opacity="0.2"/>
-                      <circle cx={p.pos_x} cy={p.pos_y} r="3" fill="#4ade80" opacity="0.9"/>
+                      {/* Внешнее свечение */}
+                      <circle cx={p.pos_x} cy={p.pos_y} r="9" fill="#22c55e" opacity="0.15"/>
+                      {/* Кольцо контроля */}
+                      <circle cx={p.pos_x} cy={p.pos_y} r="6" fill="none" stroke="#4ade80" strokeWidth="0.6" opacity="0.7" strokeDasharray="2 2"/>
+                      {/* Ядро */}
+                      <circle cx={p.pos_x} cy={p.pos_y} r="3" fill="#4ade80" opacity="0.95" filter="url(#nodeGlow)"/>
+                      {/* Угловые скобки маркера */}
+                      <path d={`M ${p.pos_x-7} ${p.pos_y-5} L ${p.pos_x-7} ${p.pos_y-7} L ${p.pos_x-5} ${p.pos_y-7}`} stroke="#4ade80" strokeWidth="0.8" fill="none" opacity="0.8"/>
+                      <path d={`M ${p.pos_x+5} ${p.pos_y-7} L ${p.pos_x+7} ${p.pos_y-7} L ${p.pos_x+7} ${p.pos_y-5}`} stroke="#4ade80" strokeWidth="0.8" fill="none" opacity="0.8"/>
+                      <path d={`M ${p.pos_x+7} ${p.pos_y+5} L ${p.pos_x+7} ${p.pos_y+7} L ${p.pos_x+5} ${p.pos_y+7}`} stroke="#4ade80" strokeWidth="0.8" fill="none" opacity="0.8"/>
+                      <path d={`M ${p.pos_x-5} ${p.pos_y+7} L ${p.pos_x-7} ${p.pos_y+7} L ${p.pos_x-7} ${p.pos_y+5}`} stroke="#4ade80" strokeWidth="0.8" fill="none" opacity="0.8"/>
                       {p.id===res.home_planet_id && (
-                        <text x={p.pos_x} y={p.pos_y-7} textAnchor="middle" fontSize="7" fill="#86efac">🏠</text>
+                        <>
+                          <text x={p.pos_x} y={p.pos_y-10} textAnchor="middle" fontSize="7" fill="#86efac">🏠</text>
+                          <text x={p.pos_x} y={p.pos_y+15} textAnchor="middle" fontSize="5" fill="#86efac" fontFamily="Orbitron, monospace" letterSpacing="0.5" opacity="0.8">HQ</text>
+                        </>
                       )}
                     </g>
                   ))}

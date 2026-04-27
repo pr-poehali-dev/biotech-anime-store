@@ -405,12 +405,13 @@ export default function GalacticEmpire() {
 
   const onSvgMouseMove = useCallback((e:React.MouseEvent) => {
     if (!isPanning.current) return;
-    const dx = (e.clientX - panStart.current.x)/mapScale;
-    const dy = (e.clientY - panStart.current.y)/mapScale;
-    if (Math.abs(dx)>3 || Math.abs(dy)>3) didDrag.current = true;
+    // Скорость перемещения = 2× (не делим на mapScale — движение 1:1 с мышью)
+    const dx = (e.clientX - panStart.current.x) * 2;
+    const dy = (e.clientY - panStart.current.y) * 2;
+    if (Math.abs(dx)>4 || Math.abs(dy)>4) didDrag.current = true;
     setMapTx(panStart.current.tx + dx);
     setMapTy(panStart.current.ty + dy);
-  },[mapScale]);
+  },[]);
 
   const onSvgMouseUp = useCallback((e:React.MouseEvent) => {
     isPanning.current = false;
@@ -419,8 +420,20 @@ export default function GalacticEmpire() {
 
   const onSvgWheel = useCallback((e:React.WheelEvent) => {
     e.preventDefault();
-    const factor = e.deltaY < 0 ? 1.15 : 0.87;
-    setMapScale(s => Math.min(4, Math.max(0.3, s*factor)));
+    const factor = e.deltaY < 0 ? 1.28 : 0.78;
+    const svgEl = svgRef.current;
+    if (!svgEl) { setMapScale(s => Math.min(10, Math.max(0.1, s*factor))); return; }
+    const rect = svgEl.getBoundingClientRect();
+    // Зум относительно позиции курсора
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+    setMapScale(prev => {
+      const next = Math.min(10, Math.max(0.1, prev * factor));
+      const ratio = next / prev;
+      setMapTx(tx => mouseX - (mouseX - tx) * ratio);
+      setMapTy(ty => mouseY - (mouseY - ty) * ratio);
+      return next;
+    });
   },[]);
 
   const resetMap = () => { setMapTx(0); setMapTy(0); setMapScale(0.28); };
@@ -833,14 +846,14 @@ export default function GalacticEmpire() {
         </div>
       </div>
 
-      <div className="flex-1 max-w-7xl mx-auto w-full p-3">
+      <div className={`flex-1 ${tab==="galaxy"?"w-full p-0":"max-w-7xl mx-auto w-full p-3"}`}>
 
         {/* ═══════════════ ГАЛАКТИКА ═══════════════ */}
         {tab==="galaxy" && (
-          <div className="flex gap-3" style={{minHeight:"78vh"}}>
+          <div className="flex gap-0" style={{height:"calc(100vh - 130px)"}}>
 
             {/* ── Карта ── */}
-            <div ref={mapWrapRef} className="flex-1 bg-slate-950 rounded-2xl border border-white/10 relative overflow-hidden select-none" style={{minHeight:"500px"}}>
+            <div ref={mapWrapRef} className="flex-1 bg-slate-950 relative overflow-hidden select-none" style={{minHeight:0}}>
 
               {/* Подсказка управления */}
               <div className="absolute top-2 left-2 z-20 flex items-center gap-2">
@@ -851,8 +864,8 @@ export default function GalacticEmpire() {
 
               {/* Кнопки управления картой */}
               <div className="absolute top-2 right-2 z-20 flex flex-col gap-1">
-                <button onClick={()=>setMapScale(s=>Math.min(4,s*1.2))} className="w-8 h-8 bg-black/60 hover:bg-white/20 rounded-lg text-white text-base font-black flex items-center justify-center transition">+</button>
-                <button onClick={()=>setMapScale(s=>Math.max(0.1,s*0.83))} className="w-8 h-8 bg-black/60 hover:bg-white/20 rounded-lg text-white text-base font-black flex items-center justify-center transition">−</button>
+                <button onClick={()=>setMapScale(s=>Math.min(10,s*1.5))} className="w-8 h-8 bg-black/60 hover:bg-white/20 rounded-lg text-white text-base font-black flex items-center justify-center transition">+</button>
+                <button onClick={()=>setMapScale(s=>Math.max(0.1,s*0.67))} className="w-8 h-8 bg-black/60 hover:bg-white/20 rounded-lg text-white text-base font-black flex items-center justify-center transition">−</button>
                 <button onClick={resetMap} className="w-8 h-8 bg-black/60 hover:bg-white/20 rounded-lg text-white text-[10px] flex items-center justify-center transition" title="Вся галактика">🌌</button>
                 <button onClick={()=>{
                   // Найти домашнюю систему игрока по home_planet_id
@@ -1230,7 +1243,7 @@ export default function GalacticEmpire() {
             </div>
 
             {/* ── Боковая панель ── */}
-            <div className="w-72 flex flex-col gap-2 overflow-y-auto" style={{maxHeight:"78vh"}}>
+            <div className="w-72 flex-shrink-0 flex flex-col gap-2 overflow-y-auto bg-slate-950/95 border-l border-white/10 p-2" style={{height:"100%"}}>
 
               {/* Загрузка флотов для панели */}
               {tab==="galaxy" && fleets.length===0 && (

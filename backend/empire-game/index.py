@@ -169,7 +169,7 @@ def handler(event: dict, context) -> dict:
 
             # Флоты на орбите
             cur.execute(f"""
-                SELECT f.id, f.fleet_name, f.ships, f.total_attack, f.total_defense,
+                SELECT f.id, f.name, f.ships, f.total_attack, f.total_defense,
                        ep.nickname, ep.race
                 FROM {S}.empire_fleets f
                 JOIN {S}.empire_players ep ON ep.id = f.owner_id
@@ -288,7 +288,7 @@ def handler(event: dict, context) -> dict:
             if not player:
                 return err('Не авторизован', 401)
             cur.execute(f"""
-                SELECT f.id, f.fleet_name, f.ships, f.total_attack, f.total_defense,
+                SELECT f.id, f.name, f.ships, f.total_attack, f.total_defense,
                        f.current_planet_id, f.target_planet_id, f.status, f.mission,
                        f.arrive_at, f.fuel, p.name, tp.name
                 FROM {S}.empire_fleets f
@@ -337,7 +337,7 @@ def handler(event: dict, context) -> dict:
                 atk = SHIPS[ship_type]['atk'] * count
                 df  = SHIPS[ship_type]['def'] * count
                 cur.execute(f"""
-                    INSERT INTO {S}.empire_fleets (owner_id, fleet_name, ships, total_attack, total_defense, current_planet_id, status, mission)
+                    INSERT INTO {S}.empire_fleets (owner_id, name, ships, total_attack, total_defense, current_planet_id, status, mission)
                     VALUES (%s,%s,%s,%s,%s,%s,'orbit','defend')
                 """, (player['id'], f'Флот {player["nickname"]}', json.dumps(init_ships), atk, df, col[1]))
             cur.execute(f"UPDATE {S}.empire_players SET fleets_count=fleets_count+0 WHERE id=%s", (player['id'],))
@@ -464,7 +464,7 @@ def handler(event: dict, context) -> dict:
             # Колонизировать
             cur.execute(f"""
                 INSERT INTO {S}.empire_colonies
-                  (player_id, planet_id, colony_name, is_capital, mine_level, solar_level)
+                  (player_id, planet_id, name, is_capital, mine_level, solar_level)
                 VALUES (%s,%s,%s,false,1,1) RETURNING id
             """, (player['id'], planet_id, f'Колония на {planet[5]}'))
             colony_id = cur.fetchone()[0]

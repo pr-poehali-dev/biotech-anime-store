@@ -218,7 +218,7 @@ def handler(event: dict, context) -> dict:
                     log.append(f"🏴 Планета захвачена! Получено {looted}")
                     # Создаём новую колонию
                     cur.execute(f"""
-                        INSERT INTO {S}.empire_colonies (player_id, planet_id, colony_name, mine_level, solar_level)
+                        INSERT INTO {S}.empire_colonies (player_id, planet_id, name, mine_level, solar_level)
                         VALUES (%s,%s,%s,0,0) RETURNING id
                     """, (player['id'], planet_id, f'Колония-{planet_id}'))
                     col_id = cur.fetchone()[0]
@@ -314,7 +314,7 @@ def handler(event: dict, context) -> dict:
 
             cur.execute(f"UPDATE {S}.empire_players SET metal=metal-2000, energy=energy-1000, crystals=crystals-500 WHERE id=%s", (player['id'],))
             cur.execute(f"""
-                INSERT INTO {S}.empire_colonies (player_id, planet_id, colony_name, mine_level, solar_level)
+                INSERT INTO {S}.empire_colonies (player_id, planet_id, name, mine_level, solar_level)
                 VALUES (%s,%s,%s,1,1) RETURNING id
             """, (player['id'], planet_id, f'Колония {planet_id}'))
             col_id = cur.fetchone()[0]

@@ -262,7 +262,7 @@ def handler(event: dict, context) -> dict:
             # Создаём столичную колонию
             cur.execute(f"""
                 INSERT INTO {S}.empire_colonies
-                  (player_id, planet_id, colony_name, is_capital, mine_level, solar_level)
+                  (player_id, planet_id, name, is_capital, mine_level, solar_level)
                 VALUES (%s,%s,%s,true,1,1) RETURNING id
             """, (pid, planet[0], f'Столица {nickname}'))
             col_id = cur.fetchone()[0]
@@ -284,7 +284,7 @@ def handler(event: dict, context) -> dict:
             start_ships = {'scout': 1, 'colonist': 1}
             cur.execute(f"""
                 INSERT INTO {S}.empire_fleets
-                  (owner_id, fleet_name, ships, total_attack, total_defense,
+                  (owner_id, name, ships, total_attack, total_defense,
                    current_planet_id, pos_x, pos_y, status, mission)
                 VALUES (%s, %s, %s::jsonb, %s, %s, %s, %s, %s, 'orbit', 'defend')
             """, (pid, f'Флот {nickname}', json.dumps(start_ships),

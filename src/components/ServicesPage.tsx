@@ -144,8 +144,11 @@ export default function ServicesPage({ setPage }: Props) {
           <h1 className="text-4xl font-black mb-3" style={{ fontFamily: "Montserrat, sans-serif" }}>
             Обслуживание и ремонт ПК
           </h1>
-          <p className="text-blue-100 text-lg max-w-2xl mx-auto mb-8">
+          <p className="text-blue-100 text-lg max-w-2xl mx-auto mb-4">
             Профессиональный ремонт для частных лиц и комплексное IT-обслуживание предприятий по договору. Быстро, надёжно, с гарантией.
+          </p>
+          <p className="text-blue-200/90 text-sm max-w-2xl mx-auto mb-8">
+            📍 Работаем по Амурской области · 🚀 По всей России — в ближайших планах
           </p>
           <div className="flex flex-wrap gap-4 justify-center">
             <button

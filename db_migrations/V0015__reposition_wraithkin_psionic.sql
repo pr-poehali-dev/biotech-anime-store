@@ -1,0 +1,21 @@
+
+UPDATE t_p83915249_biotech_anime_store.empire_systems SET pos_x=615, pos_y=320 WHERE id=91;
+UPDATE t_p83915249_biotech_anime_store.empire_systems SET pos_x=680, pos_y=320 WHERE id=92;
+UPDATE t_p83915249_biotech_anime_store.empire_systems SET pos_x=750, pos_y=320 WHERE id=93;
+UPDATE t_p83915249_biotech_anime_store.empire_systems SET pos_x=615, pos_y=460 WHERE id=94;
+UPDATE t_p83915249_biotech_anime_store.empire_systems SET pos_x=680, pos_y=455 WHERE id=95;
+UPDATE t_p83915249_biotech_anime_store.empire_systems SET pos_x=750, pos_y=460 WHERE id=96;
+UPDATE t_p83915249_biotech_anime_store.empire_systems SET pos_x=750, pos_y=385 WHERE id=97;
+UPDATE t_p83915249_biotech_anime_store.empire_systems SET pos_x=610, pos_y=385 WHERE id=98;
+UPDATE t_p83915249_biotech_anime_store.empire_systems SET pos_x=680, pos_y=385 WHERE id=99;
+UPDATE t_p83915249_biotech_anime_store.empire_systems SET pos_x=625, pos_y=480 WHERE id=100;
+UPDATE t_p83915249_biotech_anime_store.empire_systems SET pos_x=325, pos_y=55  WHERE id=101;
+UPDATE t_p83915249_biotech_anime_store.empire_systems SET pos_x=475, pos_y=55  WHERE id=102;
+UPDATE t_p83915249_biotech_anime_store.empire_systems SET pos_x=315, pos_y=140 WHERE id=103;
+UPDATE t_p83915249_biotech_anime_store.empire_systems SET pos_x=400, pos_y=150 WHERE id=104;
+UPDATE t_p83915249_biotech_anime_store.empire_systems SET pos_x=485, pos_y=140 WHERE id=105;
+UPDATE t_p83915249_biotech_anime_store.empire_systems SET pos_x=345, pos_y=215 WHERE id=106;
+UPDATE t_p83915249_biotech_anime_store.empire_systems SET pos_x=455, pos_y=215 WHERE id=107;
+UPDATE t_p83915249_biotech_anime_store.empire_systems SET pos_x=305, pos_y=210 WHERE id=108;
+UPDATE t_p83915249_biotech_anime_store.empire_systems SET pos_x=495, pos_y=210 WHERE id=109;
+UPDATE t_p83915249_biotech_anime_store.empire_systems SET pos_x=400, pos_y=230 WHERE id=110;

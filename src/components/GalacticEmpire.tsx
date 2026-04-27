@@ -241,7 +241,7 @@ export default function GalacticEmpire() {
   const panStart    = useRef({x:0,y:0,tx:0,ty:0});
   const [mapTx, setMapTx] = useState(0);
   const [mapTy, setMapTy] = useState(0);
-  const [mapScale, setMapScale] = useState(1);
+  const [mapScale, setMapScale] = useState(0.28);
 
   // ── АНИМИРОВАННЫЕ ФЛОТЫ ────────────────────────────────────────────────────
   const [animFleets, setAnimFleets] = useState<AnimFleet[]>([]);
@@ -417,7 +417,7 @@ export default function GalacticEmpire() {
     setMapScale(s => Math.min(4, Math.max(0.3, s*factor)));
   },[]);
 
-  const resetMap = () => { setMapTx(0); setMapTy(0); setMapScale(1); };
+  const resetMap = () => { setMapTx(0); setMapTy(0); setMapScale(0.28); };
 
   // ── ШПИОНАЖ ───────────────────────────────────────────────────────────────
   async function doSpy() {
@@ -846,8 +846,22 @@ export default function GalacticEmpire() {
               {/* Кнопки управления картой */}
               <div className="absolute top-2 right-2 z-20 flex flex-col gap-1">
                 <button onClick={()=>setMapScale(s=>Math.min(4,s*1.2))} className="w-8 h-8 bg-black/60 hover:bg-white/20 rounded-lg text-white text-base font-black flex items-center justify-center transition">+</button>
-                <button onClick={()=>setMapScale(s=>Math.max(0.3,s*0.83))} className="w-8 h-8 bg-black/60 hover:bg-white/20 rounded-lg text-white text-base font-black flex items-center justify-center transition">−</button>
-                <button onClick={resetMap} className="w-8 h-8 bg-black/60 hover:bg-white/20 rounded-lg text-white text-[10px] flex items-center justify-center transition" title="Сбросить вид">⊙</button>
+                <button onClick={()=>setMapScale(s=>Math.max(0.1,s*0.83))} className="w-8 h-8 bg-black/60 hover:bg-white/20 rounded-lg text-white text-base font-black flex items-center justify-center transition">−</button>
+                <button onClick={resetMap} className="w-8 h-8 bg-black/60 hover:bg-white/20 rounded-lg text-white text-[10px] flex items-center justify-center transition" title="Вся галактика">🌌</button>
+                <button onClick={()=>{
+                  // Найти домашнюю систему игрока по home_planet_id
+                  const homeP = planets.find(p=>p.id===res.home_planet_id);
+                  const homeSys = homeP ? systems.find(s=>s.id===homeP.star_system_id) : systems.find(s=>s.sector===res.race);
+                  if (homeSys) {
+                    const svgEl = svgRef.current;
+                    const rect = svgEl?.getBoundingClientRect();
+                    const w = rect?.width||600; const h = rect?.height||500;
+                    const scale = 1.2;
+                    setMapScale(scale);
+                    setMapTx(w/2 - homeSys.pos_x * scale);
+                    setMapTy(h/2 - homeSys.pos_y * scale);
+                  }
+                }} className="w-8 h-8 bg-black/60 hover:bg-white/20 rounded-lg text-white text-sm flex items-center justify-center transition" title="К моей планете">🏠</button>
               </div>
 
               {/* Легенда */}
@@ -863,7 +877,7 @@ export default function GalacticEmpire() {
               <svg
                 ref={svgRef}
                 width="100%" height="100%"
-                viewBox="0 0 800 800"
+                viewBox="0 0 2400 2400"
                 className="absolute inset-0"
                 style={{cursor:"grab"}}
                 onMouseDown={onSvgMouseDown}
@@ -872,22 +886,35 @@ export default function GalacticEmpire() {
                 onMouseLeave={onSvgMouseUp}
                 onWheel={onSvgWheel}
               >
-                <g transform={`translate(${mapTx},${mapTy}) scale(${mapScale})`} style={{transformOrigin:"400px 400px"}}>
+                <g transform={`translate(${mapTx},${mapTy}) scale(${mapScale})`} style={{transformOrigin:"1200px 1200px"}}>
 
-                  {/* Фоновые звёзды */}
-                  {STAR_BG}
-
-                  {/* Туманности (декор) */}
-                  {[{cx:200,cy:600,r:80,c:"#4f46e5"},{cx:600,cy:200,r:60,c:"#7e22ce"},{cx:650,cy:650,r:50,c:"#0f766e"}].map((n,i)=>(
-                    <ellipse key={i} cx={n.cx} cy={n.cy} rx={n.r} ry={n.r*0.6} fill={n.c} opacity="0.04"/>
+                  {/* Фоновые звёзды — заполняем всё поле 2400x2400 */}
+                  {Array.from({length:600}).map((_,i)=>(
+                    <circle key={i}
+                      cx={(i*479.5)%2400} cy={(i*317.3)%2400}
+                      r={(i%3===0)?1.4:(i%5===0)?0.9:0.5}
+                      fill="white" opacity={(i%4===0)?0.45:(i%3===0)?0.25:0.12}/>
                   ))}
 
-                  {/* Линии соединения близких систем */}
+                  {/* Туманности — по всей карте */}
+                  {[
+                    {cx:1200,cy:1200,r:200,c:"#7c3aed"},{cx:200,cy:200,r:120,c:"#f59e0b"},
+                    {cx:2200,cy:200,r:120,c:"#8b5cf6"},{cx:200,cy:2200,r:120,c:"#6b7280"},
+                    {cx:2200,cy:2200,r:120,c:"#10b981"},{cx:200,cy:1200,r:100,c:"#06b6d4"},
+                    {cx:2200,cy:1200,r:100,c:"#f1f5f9"},{cx:1200,cy:200,r:100,c:"#ec4899"},
+                    {cx:1200,cy:2200,r:100,c:"#eab308"},{cx:700,cy:700,r:90,c:"#ef4444"},
+                  ].map((n,i)=>(
+                    <ellipse key={i} cx={n.cx} cy={n.cy} rx={n.r*2} ry={n.r} fill={n.c} opacity="0.05"/>
+                  ))}
+
+                  {/* Линии соединения систем одного сектора */}
                   {systems.flatMap(a=>
-                    systems.filter(b=>b.id>a.id).map(b=>{
+                    systems.filter(b=>b.id>a.id && b.sector===a.sector).map(b=>{
                       const d=Math.hypot(b.pos_x-a.pos_x,b.pos_y-a.pos_y);
-                      if(d>200) return null;
-                      return <line key={`${a.id}-${b.id}`} x1={a.pos_x} y1={a.pos_y} x2={b.pos_x} y2={b.pos_y} stroke="white" strokeWidth="0.3" opacity={0.06+0.04*(1-d/200)}/>;
+                      if(d>450) return null;
+                      const s = SECTOR_STYLES[a.sector];
+                      return <line key={`${a.id}-${b.id}`} x1={a.pos_x} y1={a.pos_y} x2={b.pos_x} y2={b.pos_y}
+                        stroke={s?.color||"white"} strokeWidth="0.8" opacity={0.08+0.06*(1-d/450)}/>;
                     })
                   )}
 
@@ -917,14 +944,14 @@ export default function GalacticEmpire() {
                     const s = SECTOR_STYLES[sys.sector];
                     if (!s) return null;
                     const isCore = sys.sector==="core";
-                    // Точный радиус ореола = последняя орбита (та же формула что в рендере планет)
-                    const starR2 = (sys.star_size||5)*1.4 + 9;
-                    const GAP2 = 8;
+                    // Точный радиус ореола — та же формула что в рендере планет (starR=14, GAP=16, avgPr=8)
+                    const starR2 = (sys.star_size||5)*1.4 + 14;
+                    const GAP2 = 16;
+                    const avgPr = 8;
                     const n = sys.planet_count || 1;
-                    // Средний радиус планеты ~6px, считаем максимальную орбиту
-                    const avgPr = 6;
-                    const maxOrbitR = starR2 + (avgPr * 2 + GAP2) * n + GAP2;
-                    const haloR = Math.max(isCore ? 90 : 55, maxOrbitR + 12);
+                    // cursor после n планет: starR2 + n*(avgPr + GAP2 + avgPr) + GAP2 = последний центр
+                    const maxOrbitR = starR2 + GAP2 + n * (avgPr * 2 + GAP2);
+                    const haloR = Math.max(isCore ? 110 : 70, maxOrbitR + 20);
                     return (
                       <g key={`halo-${sys.id}`} style={{pointerEvents:"none"}}>
                         <circle cx={sys.pos_x} cy={sys.pos_y} r={haloR} fill={s.color} opacity={isCore?"0.08":"0.05"}/>
@@ -962,14 +989,14 @@ export default function GalacticEmpire() {
                     if (!pls.length) return null;
 
                     // Радиус самой звезды (визуальный)
-                    const starR = (selSystem.star_size||5)*1.4 + 9;
+                    const starR = (selSystem.star_size||5)*1.4 + 14;
                     // Зазор между краем кольца одной планеты и краем кольца следующей
-                    const GAP = 8;
+                    const GAP = 16;
 
                     // Предварительно считаем радиус каждой планеты
-                    // size в БД — число ~50-250, нормируем в 4..10px
+                    // size в БД — число ~50-250, нормируем в 5..11px
                     const planetR = pls.map((p:Planet) =>
-                      Math.round(3.5 + Math.min((p.size||80) / 30, 6.5))
+                      Math.round(5 + Math.min((p.size||80) / 28, 6))
                     );
 
                     // Строим орбиты: кольцо i начинается там где кончается кольцо (i-1) + GAP

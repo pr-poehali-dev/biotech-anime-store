@@ -236,12 +236,18 @@ export default function GalacticEmpire() {
 
   // ── КАРТА: pan/zoom ────────────────────────────────────────────────────────
   const svgRef      = useRef<SVGSVGElement>(null);
+  const mapWrapRef  = useRef<HTMLDivElement>(null);
   const isPanning   = useRef(false);
   const didDrag     = useRef(false);
   const panStart    = useRef({x:0,y:0,tx:0,ty:0});
   const [mapTx, setMapTx] = useState(0);
   const [mapTy, setMapTy] = useState(0);
   const [mapScale, setMapScale] = useState(0.28);
+
+  // ── МИНИ-КАРТА ────────────────────────────────────────────────────────────
+  const WORLD = 2400; // полный размер карты мира
+  const MINI  = 160;  // размер мини-карты в px
+  const miniScale = MINI / WORLD; // 0.0667
 
   // ── АНИМИРОВАННЫЕ ФЛОТЫ ────────────────────────────────────────────────────
   const [animFleets, setAnimFleets] = useState<AnimFleet[]>([]);
@@ -834,7 +840,7 @@ export default function GalacticEmpire() {
           <div className="flex gap-3" style={{minHeight:"78vh"}}>
 
             {/* ── Карта ── */}
-            <div className="flex-1 bg-slate-950 rounded-2xl border border-white/10 relative overflow-hidden select-none" style={{minHeight:"500px"}}>
+            <div ref={mapWrapRef} className="flex-1 bg-slate-950 rounded-2xl border border-white/10 relative overflow-hidden select-none" style={{minHeight:"500px"}}>
 
               {/* Подсказка управления */}
               <div className="absolute top-2 left-2 z-20 flex items-center gap-2">
@@ -1078,6 +1084,107 @@ export default function GalacticEmpire() {
                   })()}
                 </g>
               </svg>
+
+              {/* ── Мини-карта ─────────────────────────────────────────────── */}
+              {(() => {
+                const wrapW = mapWrapRef.current?.clientWidth  || 700;
+                const wrapH = mapWrapRef.current?.clientHeight || 500;
+
+                // Видимая область в координатах мира
+                const viewW = wrapW  / mapScale;
+                const viewH = wrapH  / mapScale;
+                const viewX = -mapTx / mapScale;
+                const viewY = -mapTy / mapScale;
+
+                // Позиция и размер viewport-рамки на мини-карте
+                const rx = Math.max(0, viewX * miniScale);
+                const ry = Math.max(0, viewY * miniScale);
+                const rw = Math.min(MINI, viewW * miniScale);
+                const rh = Math.min(MINI, viewH * miniScale);
+
+                return (
+                  <div className="absolute bottom-10 right-2 z-20"
+                    style={{width:MINI, height:MINI}}
+                  >
+                    {/* Фон мини-карты */}
+                    <svg
+                      width={MINI} height={MINI}
+                      viewBox={`0 0 ${MINI} ${MINI}`}
+                      className="rounded-xl border border-white/20 bg-slate-950/90 backdrop-blur shadow-xl shadow-black/60"
+                      style={{display:"block"}}
+                    >
+                      {/* Тёмный фон */}
+                      <rect width={MINI} height={MINI} fill="#020617" rx="10"/>
+
+                      {/* Туманности рас — цветные пятна */}
+                      {[
+                        {x:0.08,  y:0.08,  c:"#f59e0b", label:"☀️"},  // solarians
+                        {x:0.83,  y:0.08,  c:"#8b5cf6", label:"🌑"},  // voidstalkers
+                        {x:0.08,  y:0.83,  c:"#6b7280", label:"⚙️"},  // ironborn
+                        {x:0.83,  y:0.83,  c:"#10b981", label:"🌿"},  // arboreals
+                        {x:0.08,  y:0.5,   c:"#06b6d4", label:"🐙"},  // deepones
+                        {x:0.83,  y:0.5,   c:"#f1f5f9", label:"👻"},  // wraithkin
+                        {x:0.5,   y:0.08,  c:"#ec4899", label:"🔮"},  // psionic
+                        {x:0.5,   y:0.83,  c:"#eab308", label:"🐝"},  // hiveborn
+                        {x:0.29,  y:0.29,  c:"#ef4444", label:"🔥"},  // titanforge
+                        {x:0.5,   y:0.5,   c:"#a78bfa", label:"🤖"},  // core AI
+                      ].map((z, i) => (
+                        <g key={i}>
+                          <circle
+                            cx={z.x * MINI} cy={z.y * MINI} r={14}
+                            fill={z.c} opacity="0.18"
+                          />
+                          <text x={z.x*MINI} y={z.y*MINI+4}
+                            textAnchor="middle" fontSize="9" opacity="0.7">
+                            {z.label}
+                          </text>
+                        </g>
+                      ))}
+
+                      {/* Точки систем */}
+                      {systems.map(sys => {
+                        const sx = sys.pos_x * miniScale;
+                        const sy = sys.pos_y * miniScale;
+                        const s  = SECTOR_STYLES[sys.sector];
+                        const col = s?.color || "#94a3b8";
+                        const isHome = planets.some(p => p.id === res.home_planet_id && p.star_system_id === sys.id);
+                        const hasMine = planets.some(p => p.star_system_id === sys.id && p.owner_id === res.id);
+                        return (
+                          <g key={sys.id}>
+                            {(hasMine || isHome) && (
+                              <circle cx={sx} cy={sy} r={3.5} fill="#22c55e" opacity="0.5"/>
+                            )}
+                            <circle
+                              cx={sx} cy={sy}
+                              r={selSystem?.id === sys.id ? 2.8 : 1.6}
+                              fill={selSystem?.id === sys.id ? "#fff" : col}
+                              opacity={selSystem?.id === sys.id ? 1 : 0.7}
+                            />
+                          </g>
+                        );
+                      })}
+
+                      {/* Viewport рамка — показывает видимую область */}
+                      <rect
+                        x={rx} y={ry} width={rw} height={rh}
+                        fill="white" fillOpacity="0.06"
+                        stroke="white" strokeWidth="0.8" strokeOpacity="0.5"
+                        rx="2"
+                      />
+
+                      {/* Рамка самой мини-карты */}
+                      <rect x="0" y="0" width={MINI} height={MINI}
+                        fill="none" stroke="white" strokeWidth="0.5" strokeOpacity="0.2" rx="10"/>
+                    </svg>
+
+                    {/* Подпись */}
+                    <div className="text-center text-[8px] text-white/25 mt-0.5 select-none">
+                      Мини-карта
+                    </div>
+                  </div>
+                );
+              })()}
+
             </div>
 
             {/* ── Боковая панель ── */}

@@ -33,7 +33,7 @@ export default function Header({ page, setPage, cartCount }: HeaderProps) {
               <div className="font-black text-sm leading-tight text-foreground" style={{ fontFamily: "Montserrat, sans-serif" }}>
                 Товары · Услуги · Ветеранам
               </div>
-              <div className="text-xs text-muted-foreground leading-tight">МТМ Маркет Мишка</div>
+              <div className="text-xs text-muted-foreground leading-tight">МТМ Маркет «Максимум технологий „Мишка“»</div>
             </div>
           </button>
 

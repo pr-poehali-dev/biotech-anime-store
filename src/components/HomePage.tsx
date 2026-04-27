@@ -35,6 +35,7 @@ export default function HomePage({ setPage, products, addToCart }: Props) {
             </div>
             <h1 className="text-4xl md:text-5xl font-black leading-tight mb-4">
               МТМ Маркет<br />
+              <span className="block text-blue-100 text-xl md:text-2xl font-bold tracking-wide mb-2">«Максимум технологий „Мишка“»</span>
               <span className="text-blue-200">Услуги профессионалов</span>
             </h1>
             <p className="text-blue-100 text-lg mb-8 max-w-md">

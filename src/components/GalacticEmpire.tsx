@@ -52,6 +52,19 @@ const MINING_SHIPS: Record<string,{name:string;icon:string;desc:string;mines:str
   harvester: { name:"Харвестер",icon:"🌾", desc:"Собирает энергию из звёзд",  mines:"energy"   },
 };
 
+// ─── УТИЛИТЫ ──────────────────────────────────────────────────────────────────
+function formatCountdown(arrivalIso: string | null, nowMs: number): string {
+  if (!arrivalIso) return "";
+  const diff = new Date(arrivalIso).getTime() - nowMs;
+  if (diff <= 0) return "🟢 Прибыл";
+  const h = Math.floor(diff / 3600000);
+  const m = Math.floor((diff % 3600000) / 60000);
+  const s = Math.floor((diff % 60000) / 1000);
+  if (h > 0) return `⏱ ${h}ч ${m}м`;
+  if (m > 0) return `⏱ ${m}м ${s}с`;
+  return `⏱ ${s}с`;
+}
+
 // ─── МАГАЗИН ПАКЕТЫ ───────────────────────────────────────────────────────────
 interface ShopPackage { id:string; name:string; price_rub:number; icon:string; desc:string; rewards:Record<string,number>; bonus_score:number; }
 interface DiplomacyRel { id:number; from_id:number; to_id:number; type:string; message:string; from_nick:string; to_nick:string; date:string; }
@@ -142,7 +155,7 @@ interface Player {
 interface System { id:number; name:string; pos_x:number; pos_y:number; star_type:string; star_size:number; sector:string; planet_count:number; }
 interface Planet { id:number; name:string; star_system_id:number; pos_x:number; pos_y:number; planet_type:string; size:number; owner_id:number|null; owner_race:string|null; owner_nickname:string|null; is_ai_controlled:boolean; ai_fleet_tier:number; metal_richness:number; energy_richness:number; crystal_richness:number; special_resource:string|null; colony_id:number|null; }
 interface Colony { id:number; planet_id:number; colony_name:string; is_capital:boolean; mine_level:number; solar_level:number; lab_level:number; shipyard_level:number; barracks_level:number; crystal_mine_level:number; shield_level:number; market_level:number; fuel_refinery_level:number; dark_matter_lab_level:number; metal_stored:number; energy_stored:number; crystals_stored:number; planet_name:string; }
-interface Fleet { id:number; name:string; ships:Record<string,number>; total_attack:number; total_defense:number; current_planet_id:number|null; status:string; mission:string|null; planet_name:string|null; }
+interface Fleet { id:number; name:string; ships:Record<string,number>; total_attack:number; total_defense:number; current_planet_id:number|null; target_planet_id:number|null; status:string; mission:string|null; planet_name:string|null; arrival_at:string|null; pos_x:number; pos_y:number; target_id:number|null; }
 interface AnimFleet { id:number; fromX:number; fromY:number; toX:number; toY:number; progress:number; owner:boolean; race:string; name:string; }
 interface SpyResult { success:boolean; target:string; report:Record<string,unknown>; msg:string; }
 interface ChatMsg { id:number; player_id:number; nickname:string; race:string; message:string; created_at:string; }
@@ -190,6 +203,9 @@ export default function GalacticEmpire() {
   const [planets,   setPlanets]   = useState<Planet[]>([]);
   const [colonies,  setColonies]  = useState<Colony[]>([]);
   const [fleets,    setFleets]    = useState<Fleet[]>([]);
+  const [now,       setNow]       = useState(Date.now());
+  const [toasts,    setToasts]    = useState<{id:number;msg:string;type:"success"|"info"|"warn"}[]>([]);
+  const prevFleetStatuses = useRef<Record<number,string>>({});
   const [techMap,   setTechMap]   = useState<Record<string,number>>({});
   const [leaderboard,setLeaderboard]=useState<{id:number;nickname:string;race:string;score:number;rank_title:string;alliance:string|null;battles_won:number}[]>([]);
 
@@ -339,6 +355,43 @@ export default function GalacticEmpire() {
     if (phase!=="game" || tab!=="fleet") return;
     api(`${API.game}?action=fleets`, {token}).then(d => { if (d.fleets) setFleets(d.fleets); });
   }, [phase, tab]);
+
+  // ── ТАЙМЕР СЕКУНДНОГО ТИКА (для обратного отсчёта флотов) ─────────────────
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  // ── ПОЛЛИНГ ФЛОТОВ + УВЕДОМЛЕНИЯ О ПРИЛЁТЕ ───────────────────────────────
+  useEffect(() => {
+    if (phase !== "game" || fleets.length === 0) return;
+    const movingFleets = fleets.filter(f => f.status === "moving");
+    if (movingFleets.length === 0) return;
+    const id = setInterval(async () => {
+      const d = await api(`${API.game}?action=fleets`, {token});
+      if (!d.fleets) return;
+      const incoming: Fleet[] = d.fleets;
+      // Проверяем смену статуса moving → orbit/idle
+      incoming.forEach(f => {
+        const prev = prevFleetStatuses.current[f.id];
+        if (prev === "moving" && f.status !== "moving") {
+          const toastId = Date.now() + f.id;
+          setToasts(t => [...t, {id: toastId, msg: `🛸 Флот «${f.name}» прибыл${f.planet_name ? " к "+f.planet_name : ""}!`, type: "success"}]);
+          setTimeout(() => setToasts(t => t.filter(x => x.id !== toastId)), 6000);
+        }
+        prevFleetStatuses.current[f.id] = f.status;
+      });
+      setFleets(incoming);
+    }, 15000);
+    return () => clearInterval(id);
+  }, [phase, fleets.length > 0 && fleets.some(f => f.status === "moving")]);
+
+  // Хелпер: добавить toast
+  const pushToast = (msg: string, type: "success"|"info"|"warn" = "info") => {
+    const id = Date.now();
+    setToasts(t => [...t, {id, msg, type}]);
+    setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 5000);
+  };
 
   // ── ЗАГРУЗКА ТЕХНОЛОГИЙ ────────────────────────────────────────────────────
   useEffect(() => {
@@ -2146,10 +2199,21 @@ export default function GalacticEmpire() {
                       <div className="font-black">{col.colony_name} {col.is_capital&&"👑"}</div>
                       <div className="text-xs text-white/40">Планета: {col.planet_name}</div>
                     </div>
-                    <button onClick={()=>setSelColony(selColony?.id===col.id?null:col)}
-                      className="text-xs text-blue-400 hover:text-blue-300 bg-blue-500/10 px-3 py-1.5 rounded-lg transition">
-                      {selColony?.id===col.id?"Закрыть":"Управлять"}
-                    </button>
+                    <div className="flex gap-1.5">
+                      <button onClick={()=>{
+                        loadStation(col.planet_id);
+                        setShowStation(true);
+                        setStationTab("station");
+                      }}
+                        className="text-xs text-purple-400 hover:text-purple-300 bg-purple-500/10 hover:bg-purple-500/20 px-2.5 py-1.5 rounded-lg transition flex items-center gap-1"
+                        title="Орбитальная станция">
+                        🛸
+                      </button>
+                      <button onClick={()=>setSelColony(selColony?.id===col.id?null:col)}
+                        className="text-xs text-blue-400 hover:text-blue-300 bg-blue-500/10 px-3 py-1.5 rounded-lg transition">
+                        {selColony?.id===col.id?"Закрыть":"Управлять"}
+                      </button>
+                    </div>
                   </div>
 
                   {selColony?.id===col.id && (
@@ -2203,27 +2267,87 @@ export default function GalacticEmpire() {
         {/* ═══════════════ ФЛОТ ═══════════════ */}
         {tab==="fleet" && (
           <div>
-            <h2 className="font-black text-xl mb-4">🚀 Мои флоты</h2>
-            {fleets.length===0&&<div className="text-center text-white/30 py-12"><div className="text-5xl mb-3">🛸</div>Нет флотов. Постройте корабли в колонии.</div>}
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-black text-xl">🚀 Мои флоты</h2>
+              <button onClick={()=>api(`${API.game}?action=fleets`,{token}).then(d=>{if(d.fleets)setFleets(d.fleets);})}
+                className="px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded-xl text-xs font-bold transition">
+                🔄 Обновить
+              </button>
+            </div>
+            {fleets.length===0&&<div className="text-center text-white/30 py-12"><div className="text-5xl mb-3">🛸</div>Нет флотов. Постройте корабли в колонии или на орбитальной станции.</div>}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {fleets.map(f=>(
-                <div key={f.id} className="bg-white/5 rounded-2xl p-4 border border-white/10">
-                  <div className="flex justify-between mb-2">
-                    <div className="font-black">{f.name}</div>
-                    <span className={`text-xs px-2 py-0.5 rounded-full ${f.status==="orbit"?"bg-green-500/20 text-green-300":"bg-yellow-500/20 text-yellow-300"}`}>{f.status}</span>
-                  </div>
-                  <div className="text-xs text-white/40 mb-3">📍 {f.planet_name||"В пути"} · ⚔️{f.total_attack} 🛡️{f.total_defense}</div>
-                  <div className="grid grid-cols-4 gap-1.5">
-                    {Object.entries(f.ships||{}).filter(([,v])=>Number(v)>0).map(([sid,cnt])=>(
-                      <div key={sid} className="bg-white/5 rounded-lg p-1.5 text-center border border-white/10">
-                        <div className="text-base">{SHIPS[sid]?.icon||"🛸"}</div>
-                        <div className="text-[9px] font-bold">{cnt}</div>
-                        <div className="text-[8px] text-white/40">{SHIPS[sid]?.name||sid}</div>
+              {fleets.map(f=>{
+                const isMoving = f.status==="moving";
+                const isOrbit  = f.status==="orbit";
+                const isFight  = f.status==="fighting";
+                return (
+                  <div key={f.id} className={`rounded-2xl p-4 border transition-all ${isFight?"bg-red-950/40 border-red-500/30":isMoving?"bg-blue-950/40 border-blue-500/30":isOrbit?"bg-green-950/30 border-green-500/20":"bg-white/5 border-white/10"}`}>
+                    {/* Шапка */}
+                    <div className="flex justify-between items-start mb-2">
+                      <div>
+                        <div className="font-black text-base">{f.name}</div>
+                        <div className="text-xs text-white/40 mt-0.5">
+                          {isMoving?"🚀 В пути":isOrbit?"🪐 На орбите":isFight?"⚔️ В бою":"⚓ На базе"}
+                          {f.planet_name && <span className="ml-1">· {f.planet_name}</span>}
+                        </div>
                       </div>
-                    ))}
+                      <div className="text-right">
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${isFight?"bg-red-500/20 text-red-300":isMoving?"bg-blue-500/20 text-blue-300":isOrbit?"bg-green-500/20 text-green-300":"bg-white/10 text-white/50"}`}>
+                          {isFight?"В бою":isMoving?"Летит":isOrbit?"Орбита":"База"}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Таймер обратного отсчёта */}
+                    {isMoving && f.arrival_at && (
+                      <div className="flex items-center gap-2 bg-blue-500/10 border border-blue-500/20 rounded-xl px-3 py-2 mb-3">
+                        <span className="text-blue-400">⏱</span>
+                        <span className="text-blue-300 font-mono font-bold text-sm">{formatCountdown(f.arrival_at, now)}</span>
+                        <span className="text-blue-300/50 text-xs">до прибытия</span>
+                      </div>
+                    )}
+
+                    {/* Характеристики */}
+                    <div className="flex gap-3 text-xs text-white/50 mb-3">
+                      <span>⚔️ <span className="text-white/80 font-bold">{f.total_attack}</span></span>
+                      <span>🛡️ <span className="text-white/80 font-bold">{f.total_defense}</span></span>
+                      <span>🚀 <span className="text-white/80 font-bold">{Object.values(f.ships||{}).reduce((a,b)=>a+b,0)}</span> кораблей</span>
+                    </div>
+
+                    {/* Состав — расширенные карточки кораблей */}
+                    <div className="grid grid-cols-4 gap-1.5">
+                      {Object.entries(f.ships||{}).filter(([,v])=>Number(v)>0).map(([sid,cnt])=>{
+                        const sh = SHIPS[sid] as {icon?:string;name?:string} | undefined;
+                        // Цвет по категории
+                        const allShipDefs = shipDefs as Record<string,ShipDef>;
+                        const cat = allShipDefs[sid]?.cat;
+                        const bg = cat==="miner"?"bg-amber-900/40 border-amber-500/20":cat==="salvager"?"bg-cyan-900/40 border-cyan-500/20":cat==="military"?"bg-red-900/40 border-red-500/20":"bg-white/5 border-white/10";
+                        return (
+                          <div key={sid} className={`rounded-xl p-2 text-center border ${bg}`}>
+                            <div className="text-xl leading-none mb-0.5">{allShipDefs[sid]?.icon || sh?.icon || "🛸"}</div>
+                            <div className="text-[10px] font-black text-white">×{cnt}</div>
+                            <div className="text-[8px] text-white/40 leading-tight">{allShipDefs[sid]?.name || sh?.name || sid}</div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Быстрые действия */}
+                    {isOrbit && (
+                      <div className="flex gap-2 mt-3">
+                        <button onClick={()=>{setBattleFleetId(f.id);setTab("galaxy");pushToast("Выбери планету на карте для атаки","info");}}
+                          className="flex-1 py-1.5 bg-red-800/60 hover:bg-red-700/80 rounded-lg text-[10px] font-bold transition">
+                          ⚔️ Атаковать
+                        </button>
+                        <button onClick={()=>{setBattleFleetId(f.id);setTab("galaxy");pushToast("Выбери планету для колонизации","info");}}
+                          className="flex-1 py-1.5 bg-green-800/60 hover:bg-green-700/80 rounded-lg text-[10px] font-bold transition">
+                          🪐 Колонизировать
+                        </button>
+                      </div>
+                    )}
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
@@ -2737,6 +2861,21 @@ export default function GalacticEmpire() {
 
       </div>
 
+      {/* ── TOAST-УВЕДОМЛЕНИЯ ────────────────────────────────────────────────── */}
+      <div className="fixed top-4 right-4 z-[999] flex flex-col gap-2 pointer-events-none">
+        {toasts.map(t=>(
+          <div key={t.id}
+            className={`flex items-center gap-3 px-4 py-3 rounded-2xl shadow-2xl text-sm font-semibold backdrop-blur border animate-in slide-in-from-right-4 fade-in duration-300 pointer-events-auto
+              ${t.type==="success"?"bg-green-900/95 border-green-500/40 text-green-100":t.type==="warn"?"bg-amber-900/95 border-amber-500/40 text-amber-100":"bg-slate-800/95 border-white/20 text-white"}`}
+            style={{minWidth:240,maxWidth:320}}>
+            <span className="text-xl flex-shrink-0">{t.type==="success"?"✅":t.type==="warn"?"⚠️":"ℹ️"}</span>
+            <span>{t.msg}</span>
+            <button onClick={()=>setToasts(ts=>ts.filter(x=>x.id!==t.id))}
+              className="ml-auto text-white/40 hover:text-white flex-shrink-0 text-base leading-none">×</button>
+          </div>
+        ))}
+      </div>
+
       {/* ── ОРБИТАЛЬНАЯ СТАНЦИЯ — модальное окно ─────────────────────────────── */}
       {showStation && stationPlanet && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" onClick={()=>setShowStation(false)}>
@@ -2934,6 +3073,12 @@ export default function GalacticEmpire() {
                                   {f.status==="moving"?"В пути":f.status==="orbit"?"На орбите":f.status==="fighting"?"В бою":"На базе"}
                                   {f.planet_name && <span className="text-white/30 ml-1">· {f.planet_name}</span>}
                                 </div>
+                                {/* Таймер обратного отсчёта */}
+                                {f.status==="moving" && f.arrival_at && (
+                                  <div className="text-[10px] text-blue-300 font-mono font-bold mt-0.5">
+                                    {formatCountdown(f.arrival_at, now)}
+                                  </div>
+                                )}
                               </div>
                             </div>
                             <div className="text-right text-[10px] text-white/50">

@@ -306,7 +306,7 @@ def handler(event: dict, context) -> dict:
                         cur.execute(f"""
                             UPDATE {S}.pirate_fleets
                             SET status='attacking', target_player_id=%s,
-                                target_planet_id=%s, updated_at=NOW()
+                                target_planet_id=%s, last_action_at=NOW()
                             WHERE id=%s
                         """, (pid, planet_id, ppid))
 

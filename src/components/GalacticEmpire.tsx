@@ -161,7 +161,7 @@ interface SpyResult { success:boolean; target:string; report:Record<string,unkno
 interface ChatMsg { id:number; player_id:number; nickname:string; race:string; message:string; created_at:string; }
 interface Alliance { id:number; alliance_name:string; alliance_tag:string; emblem:string; alliance_desc:string; members_count:number; total_score:number; leader_name:string; is_recruiting:boolean; }
 interface Quest { id:string; name:string; icon:string; cat:string; desc:string; progress:number; target:number; completed:boolean; claimed:boolean; pct:number; reward:Record<string,number>; }
-interface PirateFleet { id:number; name:string; tier:number; ships:Record<string,number>; attack:number; defense:number; pos_x:number; pos_y:number; status:string; target_player_id:number|null; tech_level:number; }
+interface PirateFleet { id:number; name:string; tier:number; ships:Record<string,number>; attack:number; defense:number; total_attack:number; total_defense:number; pos_x:number; pos_y:number; status:string; target_player_id:number|null; target_planet_id:number|null; tech_level:number; }
 interface CoreFleet   { id:number; name:string; ships:Record<string,number>; attack:number; defense:number; pos_x:number; pos_y:number; status:string; target_player_id:number|null; }
 interface PirateWreck { id:number; pos_x:number; pos_y:number; metal:number; energy:number; crystals:number; fuel:number; }
 interface AiEvent     { id:number; type:string; title:string; message:string; data:string; read:boolean; date:string; }
@@ -335,12 +335,16 @@ export default function GalacticEmpire() {
     }).catch(()=>{});
   }, []);
 
-  // ── ЗАГРУЗКА ГАЛАКТИКИ ─────────────────────────────────────────────────────
+  // ── ЗАГРУЗКА ГАЛАКТИКИ + ФЛОТОВ ───────────────────────────────────────────
   useEffect(() => {
     if (phase!=="game" || tab!=="galaxy") return;
     api(`${API.game}?action=galaxy`, {token}).then(d => {
       if (d.systems) setSystems(d.systems);
       if (d.planets) setPlanets(d.planets);
+    });
+    // Автозагрузка флотов для боковой панели
+    api(`${API.game}?action=fleets`, {token}).then(d => {
+      if (d.fleets) setFleets(d.fleets);
     });
   }, [phase, tab]);
 
@@ -1730,10 +1734,12 @@ export default function GalacticEmpire() {
 
               {/* ── Контекстное меню планеты ──────────────────────────────── */}
               {planetMenu && (
-                <div
-                  className="absolute z-40 bg-slate-900/98 backdrop-blur border border-white/20 rounded-2xl shadow-2xl shadow-black/60 p-2 w-52"
-                  style={{left: Math.min(planetMenu.x+8, (mapWrapRef.current?.clientWidth||700)-220), top: Math.min(planetMenu.y+8, (mapWrapRef.current?.clientHeight||500)-300)}}
-                  onMouseLeave={()=>setPlanetMenu(null)}>
+                <>
+                  {/* Оверлей для закрытия меню */}
+                  <div className="absolute inset-0 z-30" onClick={()=>setPlanetMenu(null)}/>
+                  <div
+                    className="absolute z-40 bg-slate-900/98 backdrop-blur border border-white/20 rounded-2xl shadow-2xl shadow-black/60 p-2 w-52"
+                    style={{left: Math.min(planetMenu.x+8, (mapWrapRef.current?.clientWidth||700)-220), top: Math.min(planetMenu.y+8, (mapWrapRef.current?.clientHeight||500)-310)}}>
                   <div className="flex items-center gap-2 px-1 pb-2 border-b border-white/10 mb-2">
                     <span style={{color:PLANET_COLORS[planetMenu.planet.planet_type]||"#94a3b8"}}>●</span>
                     <div>
@@ -1796,6 +1802,7 @@ export default function GalacticEmpire() {
                     )}
                   </div>
                 </div>
+                </>
               )}
 
               {/* ── Мини-карта (кликабельная) ─────────────────────────────── */}
@@ -1894,27 +1901,43 @@ export default function GalacticEmpire() {
             {/* ── Боковая панель ── */}
             <div className="w-72 flex-shrink-0 flex flex-col gap-2 overflow-y-auto bg-slate-950/95 border-l border-white/10 p-2" style={{height:"100%"}}>
 
-              {/* Загрузка флотов для панели */}
-              {tab==="galaxy" && fleets.length===0 && (
-                <button onClick={()=>api(`${API.game}?action=fleets`,{token}).then(d=>{if(d.fleets)setFleets(d.fleets);})}
-                  className="text-[10px] text-blue-400 hover:text-blue-300 text-center py-1 transition">
-                  Загрузить мои флоты ↓
-                </button>
-              )}
+              {/* Кнопка обновить флоты */}
+              <button onClick={()=>api(`${API.game}?action=fleets`,{token}).then(d=>{if(d.fleets)setFleets(d.fleets);})}
+                className="text-[10px] text-white/30 hover:text-white/60 text-center py-1 transition flex-shrink-0">
+                🔄 {fleets.length>0?`${fleets.length} флотов`:"Обновить флоты"}
+              </button>
 
               {/* Статус пиратов — предупреждение при атаке */}
               {pirateFleets.filter(pf=>pf.status==='attacking'&&pf.target_player_id===res.id).map(pf=>(
                 <div key={`atk-${pf.id}`}
                   className="bg-red-950/80 border border-red-500/40 rounded-xl p-2.5 flex-shrink-0 animate-pulse">
                   <div className="font-black text-sm text-red-300 mb-1">🚨 Пираты атакуют!</div>
-                  <div className="text-[10px] text-white/70">
+                  <div className="text-[10px] text-white/70 mb-2">
                     <span className="font-bold">☠️ {pf.name}</span> тир {pf.tier}<br/>
-                    ⚔️{pf.attack} атака · 🛡️{pf.defense} защита
+                    ⚔️{pf.total_attack} атака · 🛡️{pf.total_defense} защита
                   </div>
-                  <button onClick={requestCoreHelp}
-                    className="w-full mt-2 py-1.5 bg-yellow-700 hover:bg-yellow-600 rounded-lg text-[10px] font-black transition">
-                    👑 Помощь Ядра
-                  </button>
+                  {/* Выбор флота для отпора */}
+                  {fleets.length > 0 && (
+                    <select value={battleFleetId||""} onChange={e=>setBattleFleetId(Number(e.target.value))}
+                      className="w-full bg-white/10 border border-red-500/20 rounded-lg px-2 py-1 text-[10px] mb-1.5">
+                      <option value="">— выбрать флот для отпора —</option>
+                      {fleets.map(f=><option key={f.id} value={f.id}>{f.name} ⚔️{f.total_attack}</option>)}
+                    </select>
+                  )}
+                  <div className="flex gap-1.5">
+                    {pf.target_planet_id && (
+                      <button
+                        onClick={()=>{if(battleFleetId)doAttack(battleFleetId, pf.target_planet_id!);}}
+                        disabled={!battleFleetId}
+                        className="flex-1 py-1.5 bg-red-700 hover:bg-red-600 disabled:opacity-40 rounded-lg text-[10px] font-black transition">
+                        ⚔️ Отразить
+                      </button>
+                    )}
+                    <button onClick={requestCoreHelp}
+                      className="flex-1 py-1.5 bg-yellow-700 hover:bg-yellow-600 rounded-lg text-[10px] font-black transition">
+                      👑 Ядро
+                    </button>
+                  </div>
                 </div>
               ))}
 

@@ -1,0 +1,1 @@
+ALTER TABLE t_p83915249_biotech_anime_store.pirate_fleets ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();

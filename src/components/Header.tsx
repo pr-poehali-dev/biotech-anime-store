@@ -19,7 +19,6 @@ const NAV = [
 
 export default function Header({ page, setPage, cartCount }: HeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
-  const isGameActive = page === "game";
 
   return (
     <header className="sticky top-0 z-50 bg-white border-b border-border shadow-sm">
@@ -32,7 +31,7 @@ export default function Header({ page, setPage, cartCount }: HeaderProps) {
             </div>
             <div className="hidden sm:block">
               <div className="font-black text-sm leading-tight text-foreground" style={{ fontFamily: "Montserrat, sans-serif" }}>
-                Товары, Услуги, Ветеранам, Игры
+                Товары · Услуги · Ветеранам
               </div>
               <div className="text-xs text-muted-foreground leading-tight">МТМ Маркет Мишка</div>
             </div>
@@ -56,18 +55,6 @@ export default function Header({ page, setPage, cartCount }: HeaderProps) {
                 {n.label}
               </button>
             ))}
-
-            {/* Кнопка Орбита: Изгои */}
-            <button
-              onClick={() => setPage("game")}
-              className={`px-3 py-2 rounded-lg text-sm font-semibold transition-colors ${
-                isGameActive
-                  ? "bg-cyan-600 text-white"
-                  : "text-cyan-700 hover:bg-cyan-50"
-              }`}
-            >
-              🛰️ Орбита: Изгои
-            </button>
           </nav>
 
           {/* Right buttons */}
@@ -121,16 +108,6 @@ export default function Header({ page, setPage, cartCount }: HeaderProps) {
                 {n.label}
               </button>
             ))}
-
-            {/* Орбита: Изгои в мобильном меню */}
-            <button
-              onClick={() => { setPage("game"); setMenuOpen(false); }}
-              className={`w-full text-left px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors mb-0.5 ${
-                isGameActive ? "bg-cyan-600 text-white" : "text-cyan-700 hover:bg-cyan-50"
-              }`}
-            >
-              🛰️ Орбита: Изгои
-            </button>
           </div>
         )}
       </div>

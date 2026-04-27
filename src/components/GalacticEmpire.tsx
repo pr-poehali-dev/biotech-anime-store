@@ -252,6 +252,9 @@ export default function GalacticEmpire() {
   const [diploMsg,      setDiploMsg]      = useState("");
   const [diploAction,   setDiploAction]   = useState<"war"|"trade_union"|"peace">("peace");
 
+  // ── ПОИСК КОЛОНИЙ ─────────────────────────────────────────────────────────
+  const [colonySearch, setColonySearch] = useState("");
+
   // ── ДОБЫЧА КОРАБЛЯМИ ──────────────────────────────────────────────────────
   const [mineFleetId,  setMineFleetId]  = useState<number|null>(null);
   const [minePlanetId, setMinePlanetId] = useState<number|null>(null);
@@ -615,6 +618,14 @@ export default function GalacticEmpire() {
     if (d.error) { setBattleLog(["❌ "+d.error]); return; }
     setBattleLog(["✅ Планета "+d.planet+" колонизирована! Создана колония #"+d.colony_id]);
     setPlayer(p=>p?{...p, colonies_count:(p.colonies_count||0)+1}:p);
+  }
+
+  // ── ОТПРАВИТЬ ФЛОТ К ПЛАНЕТЕ ─────────────────────────────────────────────
+  async function sendFleetTo(fleet_id:number, planet_id:number) {
+    const d = await api(API.game, {method:"POST", token, body:{action:"send_fleet", fleet_id, target_planet_id:planet_id, mission:"defend"}});
+    if (d.error) { setBattleLog(["❌ "+d.error]); return; }
+    setBattleLog(["🚀 Флот отправлен! Прибытие через ~"+d.travel_time_min+" мин."]);
+    setFleets(prev=>prev.map(f=>f.id===fleet_id?{...f,status:"moving"}:f));
   }
 
   // ── ДОБЫЧА КОРАБЛЯМИ ─────────────────────────────────────────────────────
@@ -1686,6 +1697,66 @@ export default function GalacticEmpire() {
                 </div>
               )}
 
+              {/* Поиск колоний */}
+              <div className="flex-shrink-0">
+                <div className="relative">
+                  <input
+                    value={colonySearch}
+                    onChange={e=>setColonySearch(e.target.value)}
+                    placeholder="🔍 Поиск колонии или планеты..."
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-[11px] focus:outline-none focus:border-blue-500 transition placeholder:text-white/30"
+                  />
+                  {colonySearch && (
+                    <button onClick={()=>setColonySearch("")}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-white/30 hover:text-white text-xs">✕</button>
+                  )}
+                </div>
+                {colonySearch.trim() && (() => {
+                  const q = colonySearch.toLowerCase();
+                  const results = planets.filter(p=>
+                    p.name?.toLowerCase().includes(q) ||
+                    (p.owner_id===res.id && p.owner_race?.toLowerCase().includes(q))
+                  ).slice(0, 8);
+                  if (results.length===0) return (
+                    <div className="text-[10px] text-white/30 text-center py-2">Ничего не найдено</div>
+                  );
+                  return (
+                    <div className="mt-1 space-y-1">
+                      {results.map(p=>{
+                        const sys = systems.find(s=>s.id===p.star_system_id);
+                        const isMine = p.owner_id===res.id;
+                        return (
+                          <button key={p.id} onClick={()=>{
+                            setSelPlanet(p);
+                            if (sys) {
+                              setSelSystem(sys);
+                              const svgEl = svgRef.current;
+                              const rect = svgEl?.getBoundingClientRect();
+                              const w=rect?.width||800, h=rect?.height||600, sc=2.5;
+                              setMapScale(sc);
+                              setMapTx(w/2 - p.pos_x*sc);
+                              setMapTy(h/2 - p.pos_y*sc);
+                            }
+                            setColonySearch("");
+                          }}
+                          className={`w-full text-left px-2.5 py-2 rounded-xl border text-[10px] transition-all
+                            ${isMine?"border-green-500/30 bg-green-500/5 hover:bg-green-500/10":"border-white/10 bg-white/5 hover:border-white/30"}`}>
+                            <div className="flex items-center justify-between">
+                              <span className="font-bold truncate">{p.name}</span>
+                              <span className="text-white/40 ml-1 flex-shrink-0">{p.planet_type}</span>
+                            </div>
+                            <div className="text-white/40 mt-0.5">
+                              {isMine ? "✅ Моя колония" : p.is_ai_controlled ? "🤖 ИИ" : p.owner_id ? "👤 Игрок" : "🆓 Свободна"}
+                              {sys && <span className="ml-1">· {sys.name}</span>}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
+              </div>
+
               {/* Выбранная система */}
               {selSystem ? (
                 <div className="bg-slate-900/80 rounded-2xl p-3 border border-white/10 flex-shrink-0">
@@ -1748,11 +1819,24 @@ export default function GalacticEmpire() {
                   {/* Действия с планетой */}
                   <div className="space-y-1.5">
                     {fleets.length>0 ? (
-                      <select value={battleFleetId||""} onChange={e=>{setBattleFleetId(Number(e.target.value));setMineFleetId(Number(e.target.value));setMinePlanetId(selPlanet.id);}}
-                        className="w-full bg-white/10 border border-white/10 rounded-lg px-2 py-1.5 text-[10px]">
-                        <option value="">— выбрать флот —</option>
-                        {fleets.map(f=><option key={f.id} value={f.id}>{f.name} ⚔️{f.total_attack}</option>)}
-                      </select>
+                      <>
+                        <select value={battleFleetId||""} onChange={e=>{setBattleFleetId(Number(e.target.value));setMineFleetId(Number(e.target.value));setMinePlanetId(selPlanet.id);}}
+                          className="w-full bg-white/10 border border-white/10 rounded-lg px-2 py-1.5 text-[10px]">
+                          <option value="">— выбрать флот —</option>
+                          {fleets.map(f=>(
+                            <option key={f.id} value={f.id}>
+                              {f.status==="moving"?"🚀":f.status==="orbit"?"🪐":"⚓"} {f.name} ⚔️{f.total_attack}
+                            </option>
+                          ))}
+                        </select>
+                        {/* Кнопка Лететь — всегда доступна при выбранном флоте */}
+                        <button
+                          onClick={()=>battleFleetId && sendFleetTo(battleFleetId, selPlanet.id)}
+                          disabled={!battleFleetId}
+                          className="w-full py-1.5 bg-blue-700 hover:bg-blue-600 disabled:bg-white/5 disabled:text-white/30 rounded-xl text-[10px] font-bold transition flex items-center justify-center gap-1">
+                          🚀 Лететь на планету
+                        </button>
+                      </>
                     ) : <div className="text-[10px] text-white/30 text-center bg-white/5 rounded-lg p-1.5">Нет флотов → вкладка Флот</div>}
 
                     {selPlanet.owner_id !== res.id && <>

@@ -268,7 +268,9 @@ export default function GalacticEmpire() {
   const [shipDefs,      setShipDefs]      = useState<Record<string,ShipDef>>({});
   const [unlockedShips, setUnlockedShips] = useState<string[]>([]);
   const [shipTechs,     setShipTechs]     = useState<Record<string,{name:string;icon:string;cost:Record<string,number>;unlocks:string}>>({});
-  const [stationTab,    setStationTab]    = useState<"station"|"ships"|"warehouse"|"factory"|"tech">("station");
+  const [stationTab,    setStationTab]    = useState<"station"|"ships"|"warehouse"|"factory"|"tech"|"fleet">("station");
+  const [fleetAction,   setFleetAction]   = useState<Record<number,string>>({});
+  const [fleetMission,  setFleetMission]  = useState<"defend"|"attack"|"mine"|"scout">("defend");
   const [showStation,   setShowStation]   = useState(false);
 
   // ── КОНТЕКСТНОЕ МЕНЮ ПЛАНЕТЫ ──────────────────────────────────────────────
@@ -687,8 +689,10 @@ export default function GalacticEmpire() {
   // ── ОТПРАВИТЬ ФЛОТ К ПЛАНЕТЕ ─────────────────────────────────────────────
   async function sendFleetTo(fleet_id:number, planet_id:number) {
     const d = await api(API.game, {method:"POST", token, body:{action:"send_fleet", fleet_id, target_planet_id:planet_id, mission:"defend"}});
-    if (d.error) { setBattleLog(["❌ "+d.error]); return; }
-    setBattleLog(["🚀 Флот отправлен! Прибытие через ~"+d.travel_time_min+" мин."]);
+    if (d.error) { setBattleLog(["❌ "+d.error]); setStationMsg("❌ "+d.error); return; }
+    const msg = "🚀 Флот отправлен! Прибытие через ~"+d.travel_time_min+" мин.";
+    setBattleLog([msg]);
+    setStationMsg("✅ "+msg);
     setFleets(prev=>prev.map(f=>f.id===fleet_id?{...f,status:"moving"}:f));
   }
 
@@ -814,7 +818,7 @@ export default function GalacticEmpire() {
   // ── АТАКА ──────────────────────────────────────────────────────────────────
   async function doAttack(fleet_id:number, planet_id:number) {
     const d = await api(API.battle, {method:"POST", token, body:{action:"attack", fleet_id, planet_id}});
-    if (d.error) { setBattleLog(["❌ "+d.error]); return; }
+    if (d.error) { setBattleLog(["❌ "+d.error]); setStationMsg("❌ "+d.error); return; }
     const log:string[] = [
       `⚔️ Атака на планету!`,
       `Атака: ${d.attacker_attack} vs Защита: ${d.defender_defense}`,
@@ -822,6 +826,7 @@ export default function GalacticEmpire() {
     ];
     if (d.loot) log.push(`Добыча: ⛏️${d.loot.metal||0} ⚡${d.loot.energy||0} 💎${d.loot.crystals||0}`);
     setBattleLog(log);
+    setStationMsg(log[2]);
     if (d.resources) setPlayer(p=>p?{...p,...d.resources}:p);
     api(`${API.battle}?action=battle_reports`, {token}).then(r=>{ if(r.reports) setBattleReports(r.reports); });
   }
@@ -2743,7 +2748,7 @@ export default function GalacticEmpire() {
             </div>
             {/* Вкладки */}
             <div className="flex gap-1 px-4 pt-3 overflow-x-auto">
-              {([["station","🛸 Станция"],["ships","🚀 Корабли"],["warehouse","📦 Склад"],["factory","⚙️ Завод"],["tech","🔬 Технологии"]] as const).map(([id,label])=>(
+              {([["station","🛸 Станция"],["fleet","⚓ Флот"],["ships","🚀 Верфь"],["warehouse","📦 Склад"],["factory","⚙️ Завод"],["tech","🔬 Технологии"]] as const).map(([id,label])=>(
                 <button key={id} onClick={()=>setStationTab(id)}
                   className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold transition ${stationTab===id?"bg-purple-600 text-white":"bg-white/5 text-white/50 hover:bg-white/10"}`}>
                   {label}
@@ -2892,6 +2897,185 @@ export default function GalacticEmpire() {
                       </div>
                     </div>
                   )}
+                </div>
+              )}
+
+              {/* ── Флот на орбите ── */}
+              {stationTab==="fleet" && (
+                <div className="space-y-3">
+                  {/* Кнопка обновить + автозагрузка */}
+                  <div className="flex items-center justify-between">
+                    <div className="text-xs text-white/40 font-bold uppercase tracking-wider">Управление флотами</div>
+                    <button onClick={()=>api(`${API.game}?action=fleets`,{token}).then(d=>{if(d.fleets)setFleets(d.fleets);})}
+                      className="px-3 py-1 bg-white/10 hover:bg-white/20 rounded-lg text-[10px] font-bold transition">
+                      🔄 Обновить
+                    </button>
+                  </div>
+
+                  {/* Флоты связанные с этой планетой — вверху, остальные ниже */}
+                  {(() => {
+                    const here  = fleets.filter(f=>f.current_planet_id===stationPlanet);
+                    const other = fleets.filter(f=>f.current_planet_id!==stationPlanet);
+                    const statusColor = (s:string) => s==="moving"?"text-blue-400":s==="orbit"?"text-green-400":s==="fighting"?"text-red-400":"text-white/50";
+                    const statusIcon  = (s:string) => s==="moving"?"🚀":s==="orbit"?"🪐":s==="fighting"?"⚔️":"⚓";
+
+                    const FleetCard = ({f, isHere}:{f:Fleet; isHere:boolean}) => {
+                      const expanded = fleetAction[f.id] !== undefined;
+                      const totalShips = Object.values(f.ships||{}).reduce((a,b)=>a+b,0);
+                      return (
+                        <div key={f.id} className={`rounded-xl border p-3 transition ${isHere?"border-purple-500/40 bg-purple-500/5":"border-white/10 bg-white/5"}`}>
+                          {/* Заголовок */}
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <span className="text-lg">{statusIcon(f.status)}</span>
+                              <div>
+                                <div className="font-bold text-sm">{f.name}</div>
+                                <div className={`text-[10px] ${statusColor(f.status)}`}>
+                                  {f.status==="moving"?"В пути":f.status==="orbit"?"На орбите":f.status==="fighting"?"В бою":"На базе"}
+                                  {f.planet_name && <span className="text-white/30 ml-1">· {f.planet_name}</span>}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="text-right text-[10px] text-white/50">
+                              <div>⚔️{f.total_attack} 🛡️{f.total_defense}</div>
+                              <div>{totalShips} кораблей</div>
+                            </div>
+                          </div>
+
+                          {/* Состав флота */}
+                          <div className="flex flex-wrap gap-1 mb-2">
+                            {Object.entries(f.ships||{}).map(([k,cnt])=>{
+                              const sh = shipDefs[k];
+                              return (
+                                <span key={k} className="bg-white/10 rounded-md px-1.5 py-0.5 text-[10px]">
+                                  {sh?.icon||"🚀"} {sh?.name||k} ×{cnt}
+                                </span>
+                              );
+                            })}
+                          </div>
+
+                          {/* Кнопки управления */}
+                          <div className="flex gap-1 flex-wrap">
+                            {isHere && (
+                              <>
+                                {/* Отправить к другой планете */}
+                                <button onClick={()=>setFleetAction(prev=>prev[f.id]===undefined?{...prev,[f.id]:"send"}:{...prev,[f.id]:prev[f.id]==="send"?undefined as unknown as string:"send"})}
+                                  className="px-2 py-1 bg-blue-700 hover:bg-blue-600 rounded-lg text-[10px] font-bold transition">
+                                  🚀 Отправить
+                                </button>
+                                <button onClick={async()=>{
+                                    setMineFleetId(f.id); setMinePlanetId(stationPlanet!);
+                                    const d=await api(API.game,{method:"POST",token,body:{action:"mine_resources",fleet_id:f.id,planet_id:stationPlanet}});
+                                    setStationMsg(d.error?"❌ "+d.error:`✅ Добыто: ⛏️${d.metal} ⚡${d.energy} 💎${d.crystals}`);
+                                    if(!d.error)setPlayer(p=>p?{...p,metal:(p.metal||0)+d.metal,energy:(p.energy||0)+d.energy,crystals:(p.crystals||0)+d.crystals}:p);
+                                  }}
+                                  className="px-2 py-1 bg-amber-700 hover:bg-amber-600 rounded-lg text-[10px] font-bold transition">
+                                  ⛏️ Добыча
+                                </button>
+                              </>
+                            )}
+                            {!isHere && (
+                              <button onClick={async()=>{
+                                  if(!stationPlanet) return;
+                                  await sendFleetTo(f.id,stationPlanet);
+                                  const d=await api(`${API.game}?action=fleets`,{token});
+                                  if(d.fleets)setFleets(d.fleets);
+                                }}
+                                className="px-2 py-1 bg-purple-700 hover:bg-purple-600 rounded-lg text-[10px] font-bold transition">
+                                🛸 Вызвать на станцию
+                              </button>
+                            )}
+                            {/* Атака ИИ с этой позиции */}
+                            {isHere && stationData && (
+                              <button onClick={()=>setFleetAction(prev=>({...prev,[f.id]:prev[f.id]==="attack"?"":  "attack"})) }
+                                className="px-2 py-1 bg-red-800 hover:bg-red-700 rounded-lg text-[10px] font-bold transition">
+                                ⚔️ Атаковать
+                              </button>
+                            )}
+                          </div>
+
+                          {/* Панель отправки */}
+                          {fleetAction[f.id]==="send" && (
+                            <div className="mt-2 p-2 bg-black/30 rounded-lg space-y-1.5">
+                              <div className="text-[10px] text-white/50 font-bold">Выбери цель:</div>
+                              <select className="w-full bg-white/10 border border-white/10 rounded-lg px-2 py-1 text-[10px]"
+                                onChange={async e=>{
+                                  const pid2 = Number(e.target.value);
+                                  if(pid2) {
+                                    await sendFleetTo(f.id,pid2);
+                                    setFleetAction(prev=>{const n={...prev}; delete n[f.id]; return n;});
+                                    const dd=await api(`${API.game}?action=fleets`,{token});
+                                    if(dd.fleets)setFleets(dd.fleets);
+                                  }
+                                }}>
+                                <option value="">— выбрать планету —</option>
+                                {/* Свои колонии */}
+                                {planets.filter(p=>p.owner_id===res.id).map(p=>(
+                                  <option key={p.id} value={p.id}>🪐 {p.name} (моя)</option>
+                                ))}
+                                {/* Свободные планеты */}
+                                {planets.filter(p=>!p.owner_id&&!p.is_ai_controlled).slice(0,20).map(p=>(
+                                  <option key={p.id} value={p.id}>🆓 {p.name}</option>
+                                ))}
+                                {/* ИИ планеты */}
+                                {planets.filter(p=>p.is_ai_controlled).slice(0,20).map(p=>(
+                                  <option key={p.id} value={p.id}>🤖 {p.name} ур.{p.ai_fleet_tier}</option>
+                                ))}
+                              </select>
+                            </div>
+                          )}
+
+                          {/* Панель атаки */}
+                          {fleetAction[f.id]==="attack" && (
+                            <div className="mt-2 p-2 bg-red-950/40 rounded-lg space-y-1.5 border border-red-500/20">
+                              <div className="text-[10px] text-red-300 font-bold">⚔️ Выбери цель атаки:</div>
+                              <select className="w-full bg-white/10 border border-red-500/20 rounded-lg px-2 py-1 text-[10px]"
+                                onChange={async e=>{
+                                  const pid2 = Number(e.target.value);
+                                  if(pid2) {
+                                    await doAttack(f.id,pid2);
+                                    setFleetAction(prev=>{const n={...prev}; delete n[f.id]; return n;});
+                                    const dd=await api(`${API.game}?action=fleets`,{token});
+                                    if(dd.fleets)setFleets(dd.fleets);
+                                  }
+                                }}>
+                                <option value="">— выбрать цель —</option>
+                                {planets.filter(p=>p.is_ai_controlled).slice(0,30).map(p=>(
+                                  <option key={p.id} value={p.id}>🤖 {p.name} ур.{p.ai_fleet_tier} (ⓘ{p.ai_fleet_tier*50} защита)</option>
+                                ))}
+                                {planets.filter(p=>p.owner_id&&p.owner_id!==res.id).slice(0,20).map(p=>(
+                                  <option key={p.id} value={p.id}>👤 {p.owner_nickname} · {p.name}</option>
+                                ))}
+                              </select>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    };
+
+                    return (
+                      <>
+                        {here.length > 0 && (
+                          <>
+                            <div className="text-xs text-white/40 font-bold uppercase tracking-wider px-1">На этой орбите</div>
+                            {here.map(f=><FleetCard key={f.id} f={f} isHere={true}/>)}
+                          </>
+                        )}
+                        {other.length > 0 && (
+                          <>
+                            <div className="text-xs text-white/40 font-bold uppercase tracking-wider px-1 mt-2">Другие флоты</div>
+                            {other.map(f=><FleetCard key={f.id} f={f} isHere={false}/>)}
+                          </>
+                        )}
+                        {fleets.length === 0 && (
+                          <div className="text-center py-8 text-white/30">
+                            <div className="text-3xl mb-2">🚀</div>
+                            <div>Нет флотов. Постройте корабли на верфи.</div>
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
               )}
 

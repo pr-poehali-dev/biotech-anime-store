@@ -9,6 +9,7 @@ const API = {
   shop:    "https://functions.poehali.dev/ae459e25-d759-47c3-890f-ad263c5d7871",
   quests:  "https://functions.poehali.dev/f27f29e2-e51e-4ed2-8058-441439fa55e4",
   pirates: "https://functions.poehali.dev/8d35835b-a30e-4b34-a815-287ce19569a9",
+  station: "https://functions.poehali.dev/fe75129b-929c-4fc0-9d1b-ad45707f5526",
 };
 
 // ─── РАСЫ (заменены на оригинальные для игры) ─────────────────────────────────
@@ -151,6 +152,10 @@ interface PirateFleet { id:number; name:string; tier:number; ships:Record<string
 interface CoreFleet   { id:number; name:string; ships:Record<string,number>; attack:number; defense:number; pos_x:number; pos_y:number; status:string; target_player_id:number|null; }
 interface PirateWreck { id:number; pos_x:number; pos_y:number; metal:number; energy:number; crystals:number; fuel:number; }
 interface AiEvent     { id:number; type:string; title:string; message:string; data:string; read:boolean; date:string; }
+interface StationData { id:number; level:number; shipyard:number; defense:number; hangar:number; lab:number; hull_hp:number; max_hull_hp:number; docked_ships:Record<string,number>; }
+interface WarehouseData { id:number; metal:number; energy:number; crystals:number; fuel:number; ore:number; alloy:number; components:number; capacity:number; level:number; }
+interface ShipDef { name:string; icon:string; cat:string; atk:number; def:number; mining:number; cargo:number; salvage?:number; tech_req:string|null; cost:Record<string,number>; desc:string; }
+interface PlanetMenu { planet:Planet; x:number; y:number; }  // контекстное меню на карте
 
 // ─── УТИЛИТЫ ──────────────────────────────────────────────────────────────────
 async function api(url:string, opts?:{method?:string;body?:object;token?:string}) {
@@ -254,6 +259,20 @@ export default function GalacticEmpire() {
 
   // ── ПОИСК КОЛОНИЙ ─────────────────────────────────────────────────────────
   const [colonySearch, setColonySearch] = useState("");
+
+  // ── ОРБИТАЛЬНАЯ СТАНЦИЯ ───────────────────────────────────────────────────
+  const [stationData,   setStationData]   = useState<StationData|null>(null);
+  const [warehouseData, setWarehouseData] = useState<WarehouseData|null>(null);
+  const [stationPlanet, setStationPlanet] = useState<number|null>(null);
+  const [stationMsg,    setStationMsg]    = useState("");
+  const [shipDefs,      setShipDefs]      = useState<Record<string,ShipDef>>({});
+  const [unlockedShips, setUnlockedShips] = useState<string[]>([]);
+  const [shipTechs,     setShipTechs]     = useState<Record<string,{name:string;icon:string;cost:Record<string,number>;unlocks:string}>>({});
+  const [stationTab,    setStationTab]    = useState<"station"|"ships"|"warehouse"|"factory"|"tech">("station");
+  const [showStation,   setShowStation]   = useState(false);
+
+  // ── КОНТЕКСТНОЕ МЕНЮ ПЛАНЕТЫ ──────────────────────────────────────────────
+  const [planetMenu, setPlanetMenu] = useState<PlanetMenu|null>(null);
 
   // ── ДОБЫЧА КОРАБЛЯМИ ──────────────────────────────────────────────────────
   const [mineFleetId,  setMineFleetId]  = useState<number|null>(null);
@@ -579,6 +598,51 @@ export default function GalacticEmpire() {
     if (d.error) { setPiratesMsg("❌ "+d.error); return; }
     setPiratesMsg("✅ "+d.message);
     loadPirateState();
+  };
+
+  // ── ОРБИТАЛЬНАЯ СТАНЦИЯ ───────────────────────────────────────────────────
+  const loadStation = useCallback(async (planet_id:number) => {
+    const d = await api(`${API.station}?action=get&planet_id=${planet_id}`, {token});
+    if (d.station !== undefined) { setStationData(d.station); setShipDefs(d.ships||{}); setUnlockedShips(d.unlocked_ships||[]); setShipTechs(d.ship_techs||{}); }
+    if (d.warehouse !== undefined) setWarehouseData(d.warehouse);
+    setStationPlanet(planet_id);
+  }, [token]);
+
+  const buildStation = async (planet_id:number) => {
+    const d = await api(API.station, {method:"POST", token, body:{action:"build", planet_id}});
+    setStationMsg(d.error ? "❌ "+d.error : "✅ "+d.message);
+    if (!d.error) loadStation(planet_id);
+  };
+
+  const upgradeModule = async (planet_id:number, module:string) => {
+    const d = await api(API.station, {method:"POST", token, body:{action:"upgrade", planet_id, module}});
+    setStationMsg(d.error ? "❌ "+d.error : "✅ "+d.message);
+    if (!d.error) { loadStation(planet_id); setPlayer(p=>p?{...p,metal:p.metal-1,energy:p.energy-1,crystals:p.crystals-1}:p); }
+  };
+
+  const buildShipStation = async (planet_id:number, ship_type:string, count:number) => {
+    const d = await api(API.station, {method:"POST", token, body:{action:"build_ship_station", planet_id, ship_type, count}});
+    setStationMsg(d.error ? "❌ "+d.error : "✅ "+d.message);
+    if (!d.error) { loadStation(planet_id); api(`${API.game}?action=fleets`,{token}).then(dd=>{if(dd.fleets)setFleets(dd.fleets);}); }
+  };
+
+  const researchShipTech = async (tech_id:string) => {
+    if (!stationPlanet) return;
+    const d = await api(API.station, {method:"POST", token, body:{action:"research_ship_tech", tech_id}});
+    setStationMsg(d.error ? "❌ "+d.error : "✅ "+d.message);
+    if (!d.error) loadStation(stationPlanet);
+  };
+
+  const processOre = async (planet_id:number) => {
+    const d = await api(API.station, {method:"POST", token, body:{action:"process_ore", planet_id}});
+    setStationMsg(d.error ? "❌ "+d.error : "✅ "+d.message);
+    if (!d.error) loadStation(planet_id);
+  };
+
+  const depositWarehouse = async (planet_id:number, resource:string, amount:number) => {
+    const d = await api(API.station, {method:"POST", token, body:{action:"warehouse_deposit", planet_id, resource, amount}});
+    setStationMsg(d.error ? "❌ "+d.error : "✅ "+d.message);
+    if (!d.error) { loadStation(planet_id); setPlayer(p=>p?{...p}:p); }
   };
 
   // ── ЗАБРАТЬ НАГРАДУ ───────────────────────────────────────────────────────
@@ -1157,10 +1221,27 @@ export default function GalacticEmpire() {
             <div ref={mapWrapRef} className="flex-1 bg-slate-950 relative overflow-hidden select-none" style={{minHeight:0}}>
 
               {/* Подсказка управления */}
-              <div className="absolute top-2 left-2 z-20 flex items-center gap-2">
+              <div className="absolute top-2 left-2 z-20 flex items-center gap-2 flex-wrap">
                 <div className="bg-black/60 backdrop-blur rounded-xl px-3 py-1.5 text-[10px] text-white/50 flex items-center gap-2">
-                  <span>🖱️ тащи</span><span>·</span><span>⚲ колесо = зум</span><span>·</span><span>{systems.length} систем</span>
+                  <span>🖱️ тащи</span><span>·</span><span>⚲ зум</span><span>·</span><span>{systems.length} систем</span>
                 </div>
+                {/* Кнопка Моя колония */}
+                {res.home_planet_id && (
+                  <button onClick={async()=>{
+                    let homeP = planets.find(p=>p.id===res.home_planet_id);
+                    if (!homeP) { const d=await api(`${API.game}?action=galaxy`,{token}); if(d.planets){setPlanets(d.planets);setSystems(d.systems||systems);homeP=d.planets.find((p:Planet)=>p.id===res.home_planet_id);} }
+                    if (homeP) {
+                      const svgEl=svgRef.current; const rect=svgEl?.getBoundingClientRect();
+                      const w=rect?.width||800,h=rect?.height||600,sc=2.5;
+                      setMapScale(sc); setMapTx(w/2-homeP.pos_x*sc); setMapTy(h/2-homeP.pos_y*sc);
+                      const sys=systems.find(s=>s.id===homeP!.star_system_id);
+                      if(sys){setSelSystem(sys);setSelPlanet(homeP);}
+                    }
+                  }}
+                  className="bg-green-900/80 hover:bg-green-800 backdrop-blur rounded-xl px-3 py-1.5 text-[10px] text-green-300 font-bold flex items-center gap-1.5 transition">
+                    🏠 Моя колония
+                  </button>
+                )}
               </div>
 
               {/* Кнопки управления картой */}
@@ -1287,6 +1368,42 @@ export default function GalacticEmpire() {
                       <text x={w.pos_x} y={w.pos_y+16} textAnchor="middle" fontSize="6" fill="#f59e0b" opacity="0.8">
                         обломки
                       </text>
+                    </g>
+                  ))}
+
+                  {/* Флоты игрока на карте — с маршрутами и временем полёта */}
+                  {fleets.filter(f=>f.status==="moving" && f.pos_x && f.pos_y).map(f=>{
+                    const targetP = planets.find(p=>p.id===f.target_id);
+                    return (
+                      <g key={`fleet-map-${f.id}`} style={{pointerEvents:"none"}}>
+                        {/* Линия маршрута */}
+                        {targetP && (
+                          <line x1={f.pos_x} y1={f.pos_y} x2={targetP.pos_x} y2={targetP.pos_y}
+                            stroke="#60a5fa" strokeWidth="1" opacity="0.3" strokeDasharray="12 6"/>
+                        )}
+                        {/* Значок флота */}
+                        <circle cx={f.pos_x} cy={f.pos_y} r="8" fill="#1d4ed8" opacity="0.8"/>
+                        <circle cx={f.pos_x} cy={f.pos_y} r="8" fill="none" stroke="#60a5fa" strokeWidth="1.5">
+                          <animate attributeName="r" values="8;14;8" dur="2s" repeatCount="indefinite"/>
+                          <animate attributeName="opacity" values="0.8;0.1;0.8" dur="2s" repeatCount="indefinite"/>
+                        </circle>
+                        <text x={f.pos_x} y={f.pos_y+4} textAnchor="middle" fontSize="8">🚀</text>
+                        {/* Подпись с именем */}
+                        <text x={f.pos_x} y={f.pos_y-12} textAnchor="middle"
+                          fontSize="6" fill="#93c5fd" fontWeight="bold">{f.name}</text>
+                      </g>
+                    );
+                  })}
+
+                  {/* Мои планеты — зелёный маркер */}
+                  {planets.filter(p=>p.owner_id===res.id).map(p=>(
+                    <g key={`myplanet-${p.id}`} style={{cursor:"pointer"}}
+                      onClick={()=>{ setSelPlanet(p); const sys=systems.find(s=>s.id===p.star_system_id); if(sys)setSelSystem(sys); }}>
+                      <circle cx={p.pos_x} cy={p.pos_y} r="6" fill="#22c55e" opacity="0.2"/>
+                      <circle cx={p.pos_x} cy={p.pos_y} r="3" fill="#4ade80" opacity="0.9"/>
+                      {p.id===res.home_planet_id && (
+                        <text x={p.pos_x} y={p.pos_y-7} textAnchor="middle" fontSize="7" fill="#86efac">🏠</text>
+                      )}
                     </g>
                   ))}
 
@@ -1506,7 +1623,18 @@ export default function GalacticEmpire() {
 
                           {/* Группа вращения вокруг центра звезды */}
                           <g
-                            onClick={e=>{e.stopPropagation();setSelPlanet(p);setSpyPanel(false);}}
+                            onClick={e=>{
+                              e.stopPropagation();
+                              setSelPlanet(p);
+                              setSpyPanel(false);
+                              // Контекстное меню при клике
+                              const rect = svgRef.current?.getBoundingClientRect();
+                              if (rect) {
+                                const sx = cx + mapTx;
+                                const sy = (cy - orbitR) * mapScale + mapTy;
+                                setPlanetMenu({planet:p, x: e.clientX - rect.left, y: e.clientY - rect.top});
+                              }
+                            }}
                             style={{cursor:"pointer"}}>
                             <animateTransform
                               attributeName="transform"
@@ -1541,6 +1669,76 @@ export default function GalacticEmpire() {
                   })()}
                 </g>
               </svg>
+
+              {/* ── Контекстное меню планеты ──────────────────────────────── */}
+              {planetMenu && (
+                <div
+                  className="absolute z-40 bg-slate-900/98 backdrop-blur border border-white/20 rounded-2xl shadow-2xl shadow-black/60 p-2 w-52"
+                  style={{left: Math.min(planetMenu.x+8, (mapWrapRef.current?.clientWidth||700)-220), top: Math.min(planetMenu.y+8, (mapWrapRef.current?.clientHeight||500)-300)}}
+                  onMouseLeave={()=>setPlanetMenu(null)}>
+                  <div className="flex items-center gap-2 px-1 pb-2 border-b border-white/10 mb-2">
+                    <span style={{color:PLANET_COLORS[planetMenu.planet.planet_type]||"#94a3b8"}}>●</span>
+                    <div>
+                      <div className="font-bold text-xs">{planetMenu.planet.name}</div>
+                      <div className="text-[9px] text-white/40">{planetMenu.planet.planet_type} · Размер {planetMenu.planet.size}</div>
+                    </div>
+                  </div>
+                  {/* Статус */}
+                  <div className="text-[10px] text-white/50 mb-2 px-1">
+                    {planetMenu.planet.owner_id===res.id ? "✅ Ваша колония" : planetMenu.planet.is_ai_controlled ? `🤖 ИИ ур.${planetMenu.planet.ai_fleet_tier}` : planetMenu.planet.owner_id ? `👤 Игрок` : "🆓 Свободна"}
+                  </div>
+                  {/* Выбор флота */}
+                  <select value={battleFleetId||""} onChange={e=>setBattleFleetId(Number(e.target.value))}
+                    className="w-full bg-white/10 border border-white/10 rounded-lg px-2 py-1 text-[10px] mb-1.5">
+                    <option value="">— флот —</option>
+                    {fleets.map(f=><option key={f.id} value={f.id}>{f.name}</option>)}
+                  </select>
+                  <div className="space-y-1">
+                    <button onClick={()=>{if(battleFleetId)sendFleetTo(battleFleetId,planetMenu.planet.id);setPlanetMenu(null);}}
+                      disabled={!battleFleetId}
+                      className="w-full py-1.5 bg-blue-700 hover:bg-blue-600 disabled:opacity-40 rounded-lg text-[10px] font-bold transition">
+                      🚀 Лететь
+                    </button>
+                    {!planetMenu.planet.owner_id && !planetMenu.planet.is_ai_controlled && (
+                      <button onClick={()=>{if(battleFleetId)doColonize(battleFleetId,planetMenu.planet.id);setPlanetMenu(null);}}
+                        disabled={!battleFleetId}
+                        className="w-full py-1.5 bg-green-700 hover:bg-green-600 disabled:opacity-40 rounded-lg text-[10px] font-bold transition">
+                        🪐 Колонизировать
+                      </button>
+                    )}
+                    {(planetMenu.planet.is_ai_controlled || (planetMenu.planet.owner_id && planetMenu.planet.owner_id!==res.id)) && (
+                      <button onClick={()=>{if(battleFleetId)doAttack(battleFleetId,planetMenu.planet.id);setPlanetMenu(null);}}
+                        disabled={!battleFleetId}
+                        className="w-full py-1.5 bg-red-700 hover:bg-red-600 disabled:opacity-40 rounded-lg text-[10px] font-bold transition">
+                        ⚔️ Атаковать
+                      </button>
+                    )}
+                    {fleets.some(f=>Object.keys(f.ships||{}).some(s=>['miner_small','miner_medium','miner_large'].includes(s))) && (
+                      <button onClick={()=>{setMineFleetId(battleFleetId);setMinePlanetId(planetMenu.planet.id);doMine();setPlanetMenu(null);}}
+                        disabled={!battleFleetId}
+                        className="w-full py-1.5 bg-amber-700 hover:bg-amber-600 disabled:opacity-40 rounded-lg text-[10px] font-bold transition">
+                        ⛏️ Добыча руды
+                      </button>
+                    )}
+                    {fleets.some(f=>Object.keys(f.ships||{}).some(s=>['salvager_drone','salvager_light','salvager_medium','salvager_heavy','salvager_titan'].includes(s))) && pirateWrecks.length>0 && (
+                      <button onClick={()=>{const w=pirateWrecks[0];salvageWreck(w.id);setPlanetMenu(null);}}
+                        className="w-full py-1.5 bg-amber-900 hover:bg-amber-800 rounded-lg text-[10px] font-bold transition">
+                        💥 Собрать обломки
+                      </button>
+                    )}
+                    {planetMenu.planet.owner_id===res.id && (
+                      <button onClick={()=>{
+                        loadStation(planetMenu.planet.id);
+                        setShowStation(true);
+                        setPlanetMenu(null);
+                      }}
+                        className="w-full py-1.5 bg-purple-700 hover:bg-purple-600 rounded-lg text-[10px] font-bold transition">
+                        🛸 Орбитальная станция
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {/* ── Мини-карта (кликабельная) ─────────────────────────────── */}
               {(() => {
@@ -2533,6 +2731,213 @@ export default function GalacticEmpire() {
         )}
 
       </div>
+
+      {/* ── ОРБИТАЛЬНАЯ СТАНЦИЯ — модальное окно ─────────────────────────────── */}
+      {showStation && stationPlanet && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" onClick={()=>setShowStation(false)}>
+          <div className="bg-slate-900 border border-purple-500/30 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl shadow-purple-500/20"
+            onClick={e=>e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-3 border-b border-white/10">
+              <div className="font-black text-lg">🛸 Орбитальная станция</div>
+              <button onClick={()=>setShowStation(false)} className="text-white/40 hover:text-white text-xl leading-none">×</button>
+            </div>
+            {/* Вкладки */}
+            <div className="flex gap-1 px-4 pt-3 overflow-x-auto">
+              {([["station","🛸 Станция"],["ships","🚀 Корабли"],["warehouse","📦 Склад"],["factory","⚙️ Завод"],["tech","🔬 Технологии"]] as const).map(([id,label])=>(
+                <button key={id} onClick={()=>setStationTab(id)}
+                  className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold transition ${stationTab===id?"bg-purple-600 text-white":"bg-white/5 text-white/50 hover:bg-white/10"}`}>
+                  {label}
+                </button>
+              ))}
+            </div>
+            <div className="p-4">
+              {stationMsg && <div className={`mb-3 text-sm px-3 py-2 rounded-xl ${stationMsg.startsWith("✅")?"bg-green-500/10 text-green-300 border border-green-500/20":"bg-red-500/10 text-red-300 border border-red-500/20"}`}>{stationMsg}</div>}
+
+              {/* ── Станция ── */}
+              {stationTab==="station" && (
+                <div className="space-y-3">
+                  {!stationData ? (
+                    <div className="text-center py-8">
+                      <div className="text-4xl mb-3">🛸</div>
+                      <div className="text-white/60 mb-4">Орбитальная станция ещё не построена</div>
+                      <button onClick={()=>buildStation(stationPlanet)}
+                        className="px-6 py-3 bg-purple-700 hover:bg-purple-600 rounded-xl font-bold transition">
+                        Построить (⛏️2000 ⚡1000 💎500)
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="grid grid-cols-2 gap-3 mb-4">
+                        <div className="bg-white/5 rounded-xl p-3 text-center">
+                          <div className="text-2xl">🛸</div>
+                          <div className="font-bold text-sm">Ур.{stationData.level}</div>
+                          <div className="text-xs text-white/40">Станция</div>
+                          <div className="w-full bg-white/10 rounded-full h-1 mt-1">
+                            <div className="h-1 rounded-full bg-purple-400" style={{width:`${(stationData.hull_hp/stationData.max_hull_hp)*100}%`}}/>
+                          </div>
+                          <div className="text-[10px] text-white/30 mt-0.5">{stationData.hull_hp}/{stationData.max_hull_hp} HP</div>
+                        </div>
+                        {Object.entries({shipyard:"🏭 Верфь",defense:"🛡️ Щит",hangar:"🚀 Ангар",lab:"🔬 Лаборатория"}).map(([key,label])=>(
+                          <div key={key} className="bg-white/5 rounded-xl p-3">
+                            <div className="flex justify-between items-center mb-1">
+                              <span className="text-xs font-bold">{label}</span>
+                              <span className="text-xs text-purple-400 font-black">Ур.{stationData[key as keyof StationData] as number}</span>
+                            </div>
+                            <button onClick={()=>upgradeModule(stationPlanet, key)}
+                              className="w-full py-1 bg-purple-800 hover:bg-purple-700 rounded-lg text-[10px] font-bold transition">
+                              ⬆️ Улучшить
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* ── Корабли ── */}
+              {stationTab==="ships" && stationData && (
+                <div className="space-y-2">
+                  {stationData.shipyard < 1
+                    ? <div className="text-white/40 text-sm text-center py-4">Нужна Верфь (ур.1+) на станции</div>
+                    : Object.entries(shipDefs).filter(([k])=>unlockedShips.includes(k)).map(([key, sh])=>{
+                      const catColors:Record<string,string> = {miner:"bg-amber-900/40 border-amber-500/30", salvager:"bg-cyan-900/40 border-cyan-500/30", military:"bg-red-900/40 border-red-500/30"};
+                      return (
+                        <div key={key} className={`rounded-xl p-3 border ${catColors[sh.cat]||"bg-white/5 border-white/10"}`}>
+                          <div className="flex items-center justify-between mb-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-lg">{sh.icon}</span>
+                              <div>
+                                <div className="font-bold text-sm">{sh.name}</div>
+                                <div className="text-[10px] text-white/40">{sh.desc}</div>
+                              </div>
+                            </div>
+                            <div className="text-right text-[10px] text-white/50">
+                              {sh.atk>0&&<div>⚔️{sh.atk}</div>}
+                              {sh.def>0&&<div>🛡️{sh.def}</div>}
+                              {sh.mining>0&&<div>⛏️{sh.mining}</div>}
+                              {sh.cargo>0&&<div>📦{sh.cargo}т</div>}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1 text-[10px] text-white/40">
+                              ⛏️{sh.cost.metal} ⚡{sh.cost.energy} 💎{sh.cost.crystals}
+                            </div>
+                            <button onClick={()=>buildShipStation(stationPlanet, key, 1)}
+                              className="px-3 py-1 bg-blue-700 hover:bg-blue-600 rounded-lg text-[10px] font-bold transition">
+                              Построить 1
+                            </button>
+                            <button onClick={()=>buildShipStation(stationPlanet, key, 5)}
+                              className="px-3 py-1 bg-blue-800 hover:bg-blue-700 rounded-lg text-[10px] font-bold transition">
+                              ×5
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })
+                  }
+                </div>
+              )}
+
+              {/* ── Склад ── */}
+              {stationTab==="warehouse" && (
+                <div className="space-y-2">
+                  {!warehouseData ? (
+                    <div className="text-white/40 text-sm text-center py-4">Постройте станцию для активации склада</div>
+                  ) : (
+                    <>
+                      <div className="bg-white/5 rounded-xl p-3 mb-3">
+                        <div className="flex justify-between mb-1">
+                          <span className="text-sm font-bold">📦 Склад ур.{warehouseData.level}</span>
+                          <span className="text-xs text-white/40">{Object.values({metal:warehouseData.metal,energy:warehouseData.energy,crystals:warehouseData.crystals,fuel:warehouseData.fuel,ore:warehouseData.ore}).reduce((a,b)=>a+b,0)}/{warehouseData.capacity}</span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          {([["metal","⛏️ Металл",warehouseData.metal],["energy","⚡ Энергия",warehouseData.energy],["crystals","💎 Кристаллы",warehouseData.crystals],["fuel","⛽ Топливо",warehouseData.fuel],["ore","🪨 Руда",warehouseData.ore],["alloy","⚙️ Сплавы",warehouseData.alloy],["components","🔩 Компоненты",warehouseData.components]] as [string,string,number][]).map(([key,label,val])=>(
+                            <div key={key} className="bg-black/30 rounded-lg p-2">
+                              <div className="text-[10px] text-white/50">{label}</div>
+                              <div className="font-bold text-sm">{val}</div>
+                              <button onClick={()=>depositWarehouse(stationPlanet, key, 100)}
+                                className="w-full mt-1 py-0.5 bg-white/10 hover:bg-white/20 rounded text-[9px] transition">
+                                + Загрузить 100
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* ── Завод ── */}
+              {stationTab==="factory" && (
+                <div>
+                  {!warehouseData ? (
+                    <div className="text-white/40 text-sm text-center py-4">Нужна орбитальная станция</div>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="bg-white/5 rounded-xl p-4">
+                        <div className="text-lg font-black mb-1">⚙️ Перерабатывающий завод</div>
+                        <div className="text-sm text-white/50 mb-3">Перерабатывает руду в сплавы и компоненты</div>
+                        <div className="grid grid-cols-3 gap-2 mb-3 text-center text-xs">
+                          <div className="bg-black/30 rounded-lg p-2"><div>🪨</div><div className="font-bold">{warehouseData.ore}</div><div className="text-white/40">Руда</div></div>
+                          <div className="bg-black/30 rounded-lg p-2 text-white/40 flex items-center justify-center text-xl">→</div>
+                          <div className="bg-black/30 rounded-lg p-2"><div>⚙️🔩</div><div className="font-bold">{warehouseData.alloy+warehouseData.components}</div><div className="text-white/40">Продукты</div></div>
+                        </div>
+                        <button onClick={()=>processOre(stationPlanet)}
+                          disabled={warehouseData.ore===0}
+                          className="w-full py-2.5 bg-amber-700 hover:bg-amber-600 disabled:opacity-40 rounded-xl font-bold transition">
+                          ⚙️ Запустить переработку
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ── Технологии кораблей ── */}
+              {stationTab==="tech" && (
+                <div className="space-y-2">
+                  {!stationData || stationData.lab < 1
+                    ? <div className="text-white/40 text-sm text-center py-4">Нужна Лаборатория (ур.1+) на станции</div>
+                    : Object.entries(shipTechs).map(([tid, tech])=>{
+                      const isResearched = unlockedShips.includes(tech.unlocks);
+                      const unlockShip = shipDefs[tech.unlocks];
+                      return (
+                        <div key={tid} className={`rounded-xl p-3 border ${isResearched?"border-green-500/30 bg-green-500/5 opacity-60":"border-white/10 bg-white/5"}`}>
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xl">{tech.icon}</span>
+                              <div>
+                                <div className="font-bold text-sm">{tech.name}</div>
+                                <div className="text-[10px] text-white/40">
+                                  Открывает: {unlockShip?.name||tech.unlocks} {unlockShip?.icon}
+                                </div>
+                              </div>
+                            </div>
+                            {isResearched
+                              ? <span className="text-green-400 text-sm">✅</span>
+                              : <button onClick={()=>researchShipTech(tid)}
+                                  className="px-3 py-1.5 bg-purple-700 hover:bg-purple-600 rounded-lg text-[10px] font-bold transition">
+                                  Изучить
+                                </button>
+                            }
+                          </div>
+                          {!isResearched && (
+                            <div className="text-[10px] text-white/30 mt-1 ml-9">
+                              ⛏️{tech.cost.metal} ⚡{tech.cost.energy} 💎{tech.cost.crystals}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })
+                  }
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── ТУТОРИАЛ ─────────────────────────────────────────────────────────── */}
       {tutVisible && localStorage.getItem("ge_tut") !== "done" && (() => {

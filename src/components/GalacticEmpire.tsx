@@ -853,23 +853,34 @@ export default function GalacticEmpire() {
               В стартовый флот включён <span className="text-green-400 font-bold">корабль Колонист 🛸</span> для будущих колоний.
             </p>
           </div>
+          {availPlanets.length === 0 && (
+            <div className="text-center text-white/40 py-8">⏳ Загружаем доступные планеты...</div>
+          )}
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-72 overflow-y-auto mb-4">
-            {availPlanets.map(p=>(
-              <button key={p.id} onClick={()=>setSelStartPlanet(p)}
-                className={`text-left p-3 rounded-xl border transition-all ${selStartPlanet?.id===p.id?"border-purple-400 bg-purple-500/20":"border-white/10 hover:border-white/30 bg-white/5"}`}>
-                <div className="font-bold text-sm truncate">{p.name}</div>
-                <div className="text-[10px] text-white/50 mt-0.5">Сектор: {p.sector}</div>
-                <div className="flex gap-2 mt-1 text-[10px] text-white/40">
-                  {p.metal_rich && <span>⛏️Металл</span>}
-                  {p.energy_rich && <span>⚡Энергия</span>}
-                </div>
-              </button>
-            ))}
+            {availPlanets.map(p=>{
+              const metalPct = Math.round((p.metal_richness || 1) * 100);
+              const energyPct = Math.round((p.energy_richness || 1) * 100);
+              const typeIcons: Record<string,string> = {terrestrial:'🌍',desert:'🏜️',ocean:'🌊',ice:'❄️',volcanic:'🌋',jungle:'🌿',gas_giant:'🌀',barren:'🪨'};
+              return (
+                <button key={p.id} onClick={()=>setSelStartPlanet(p)}
+                  className={`text-left p-3 rounded-xl border transition-all ${selStartPlanet?.id===p.id?"border-purple-400 bg-purple-500/20 shadow-lg shadow-purple-500/20":"border-white/10 hover:border-white/30 bg-white/5"}`}>
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <span className="text-base">{typeIcons[p.planet_type]||'🪐'}</span>
+                    <div className="font-bold text-xs truncate leading-tight">{p.name}</div>
+                  </div>
+                  <div className="text-[9px] text-white/40 mb-1 capitalize">{p.biome} · размер {p.size}</div>
+                  <div className="flex gap-1.5 text-[9px]">
+                    <span className={metalPct >= 120 ? "text-yellow-400" : "text-white/50"}>⛏️{metalPct}%</span>
+                    <span className={energyPct >= 120 ? "text-cyan-400" : "text-white/50"}>⚡{energyPct}%</span>
+                  </div>
+                </button>
+              );
+            })}
           </div>
           {selStartPlanet && (
             <div className="bg-purple-500/10 border border-purple-500/30 rounded-xl p-3 mb-4 text-sm">
               <span className="font-bold text-purple-300">Выбрана:</span> {selStartPlanet.name}
-              <span className="text-white/50 ml-2">· Сектор {selStartPlanet.sector}</span>
+              <span className="text-white/50 ml-2">· {selStartPlanet.biome} · размер {selStartPlanet.size}</span>
             </div>
           )}
           {verifyErr && <div className="bg-red-500/20 border border-red-500/30 text-red-300 text-sm rounded-xl px-4 py-2.5 mb-4">{verifyErr}</div>}

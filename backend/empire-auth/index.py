@@ -429,18 +429,19 @@ def handler(event: dict, context) -> dict:
                     'battles_won','alliance','is_online','last_seen_at']
             return ok({'leaderboard': [dict(zip(cols, r)) for r in cur.fetchall()]})
 
-        # ── СПИСОК ПЛАНЕТ ДЛЯ ВЫБОРА (в секторе расы) ─────────────────────────
+        # ── СПИСОК ПЛАНЕТ ДЛЯ ВЫБОРА ─────────────────────────────────────────
         if action == 'available_planets':
-            race = params.get('race', '')
             cur.execute(f"""
-                SELECT id, name, pos_x, pos_y, planet_type, metal_rich, energy_rich, sector,
-                       temperature, gravity
+                SELECT id, name, pos_x, pos_y, planet_type, biome,
+                       metal_richness, energy_richness, crystal_richness,
+                       size, description
                 FROM {S}.empire_planets
-                WHERE owner_id IS NULL AND ai_fleet_tier = 0
+                WHERE owner_id IS NULL AND ai_fleet_tier = 0 AND is_colonizable = true
                 ORDER BY RANDOM() LIMIT 30
             """)
-            cols = ['id','name','pos_x','pos_y','planet_type','metal_rich','energy_rich','sector',
-                    'temperature','gravity']
+            cols = ['id','name','pos_x','pos_y','planet_type','biome',
+                    'metal_richness','energy_richness','crystal_richness',
+                    'size','description']
             planets = [dict(zip(cols, r)) for r in cur.fetchall()]
             return ok({'planets': planets})
 

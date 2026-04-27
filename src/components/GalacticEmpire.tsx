@@ -1038,68 +1038,75 @@ export default function GalacticEmpire() {
   // ═══════════════════════════════════════════════════════════════════════════
   if (phase==="auth") {
     return (
-      <div className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-4 relative overflow-hidden">
+      <div className="min-h-screen sci-bg text-cyan-50 flex flex-col items-center justify-center p-4 relative overflow-hidden">
         {/* Звёздный фон */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          {Array.from({length:80}).map((_,i)=>(
-            <div key={i} className="absolute rounded-full bg-white" style={{
+        <div className="absolute inset-0 overflow-hidden pointer-events-none z-[1]">
+          {Array.from({length:120}).map((_,i)=>(
+            <div key={i} className="absolute rounded-full bg-cyan-100 anim-twinkle" style={{
               left:`${Math.random()*100}%`, top:`${Math.random()*100}%`,
               width:`${Math.random()*2+0.5}px`, height:`${Math.random()*2+0.5}px`,
-              opacity: Math.random()*0.6+0.2,
+              opacity: Math.random()*0.7+0.2,
+              animationDelay: `${Math.random()*3}s`,
             }}/>
           ))}
         </div>
+        {/* Сканлайн */}
+        <div className="sci-scan-line"/>
 
         <div className="relative z-10 max-w-lg w-full">
           {/* Заголовок */}
           <div className="text-center mb-8">
-            <div className="text-7xl mb-4">🌌</div>
-            <h1 className="text-5xl font-black mb-2 bg-gradient-to-r from-blue-400 via-purple-400 to-cyan-300 bg-clip-text text-transparent tracking-tight">
-              Галактическая<br/>Империя
+            <div className="inline-flex items-center justify-center mb-4">
+              <span className="text-6xl drop-shadow-[0_0_20px_rgba(34,211,238,0.5)]">🌌</span>
+            </div>
+            <div className="sci-divider mb-3"/>
+            <h1 className="text-4xl sci-title font-black mb-2 text-cyan-200 sci-text-glow">
+              ГАЛАКТИЧЕСКАЯ<br/>ИМПЕРИЯ
             </h1>
-            <p className="text-slate-400">Реальное время · 9 рас · Миллиарды миров</p>
-            <div className="flex justify-center gap-4 mt-4 text-xs text-slate-500">
-              {["🪐 Колонизируй планеты","⚔️ Сражайся за ресурсы","🤝 Создавай альянсы","🔬 Исследуй технологии"].map(f=>(
+            <div className="sci-divider mt-3 mb-3"/>
+            <p className="sci-mono text-xs text-cyan-400/70 tracking-widest">REAL-TIME · 9 RACES · ∞ WORLDS</p>
+            <div className="flex justify-center flex-wrap gap-x-3 gap-y-1 mt-4 text-[10px] sci-mono text-cyan-300/50">
+              {["[ COLONIZE ]","[ COMBAT ]","[ ALLIANCE ]","[ RESEARCH ]"].map(f=>(
                 <span key={f}>{f}</span>
               ))}
             </div>
           </div>
 
-          <div className="bg-slate-900/80 backdrop-blur rounded-2xl p-6 border border-white/10 shadow-2xl">
-            <div className="flex gap-2 mb-5">
+          <div className="sci-panel rounded-md p-6 sci-corner relative">
+            <div className="flex gap-1.5 mb-5">
               {(["login","register"] as const).map(m=>(
                 <button key={m} onClick={()=>setAuthTab(m)}
-                  className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all ${authTab===m?"bg-blue-600 text-white shadow-lg shadow-blue-500/20":"bg-white/5 text-white/50 hover:bg-white/10"}`}>
-                  {m==="login"?"🔑 Войти":"🚀 Регистрация"}
+                  className={`flex-1 py-2.5 sci-btn text-xs ${authTab===m?"!bg-cyan-500/30 !border-cyan-400 !text-cyan-100":""}`}>
+                  {m==="login"?"АВТОРИЗАЦИЯ":"РЕГИСТРАЦИЯ"}
                 </button>
               ))}
             </div>
 
             {authTab==="register" && <>
               <div className="mb-3">
-                <label className="text-xs text-slate-400 mb-1 block">Почта</label>
+                <label className="text-[10px] sci-title text-cyan-400/70 mb-1 block">▸ E-MAIL</label>
                 <input type="email" value={form.email} onChange={e=>setForm(f=>({...f,email:e.target.value}))}
-                  placeholder="commander@galaxy.net" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-500 transition"/>
+                  placeholder="commander@galaxy.net" className="w-full sci-panel-inner rounded px-3 py-2 text-sm sci-mono text-cyan-100 focus:outline-none focus:border-cyan-400 transition placeholder-cyan-700"/>
               </div>
               <div className="mb-3">
-                <label className="text-xs text-slate-400 mb-1 block">Логин</label>
+                <label className="text-[10px] sci-title text-cyan-400/70 mb-1 block">▸ ID</label>
                 <input value={form.login} onChange={e=>setForm(f=>({...f,login:e.target.value}))}
-                  placeholder="admiral_nova" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-500 transition"/>
+                  placeholder="admiral_nova" className="w-full sci-panel-inner rounded px-3 py-2 text-sm sci-mono text-cyan-100 focus:outline-none focus:border-cyan-400 transition placeholder-cyan-700"/>
               </div>
               <div className="mb-3">
-                <label className="text-xs text-slate-400 mb-1 block">Никнейм (имя в игре)</label>
+                <label className="text-[10px] sci-title text-cyan-400/70 mb-1 block">▸ CALL SIGN</label>
                 <input value={form.nickname} onChange={e=>setForm(f=>({...f,nickname:e.target.value}))}
-                  placeholder="Адмирал Нова" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-500 transition"/>
+                  placeholder="Адмирал Нова" className="w-full sci-panel-inner rounded px-3 py-2 text-sm sci-mono text-cyan-100 focus:outline-none focus:border-cyan-400 transition placeholder-cyan-700"/>
               </div>
               <div className="mb-4">
-                <label className="text-xs text-slate-400 mb-2 block">Выберите расу</label>
+                <label className="text-[10px] sci-title text-cyan-400/70 mb-2 block">▸ FACTION SELECT</label>
                 <div className="grid grid-cols-3 gap-1.5">
                   {(Object.entries(RACES) as [RaceId,typeof RACES[RaceId]][]).map(([id,r])=>(
                     <button key={id} onClick={()=>setForm(f=>({...f,race:id}))}
-                      className={`text-left px-2 py-2 rounded-xl border text-xs transition-all ${form.race===id?"border-blue-400 bg-blue-500/20":"border-white/10 hover:border-white/30 bg-white/5"}`}>
+                      className={`text-left px-2 py-2 rounded border text-xs transition-all ${form.race===id?"border-cyan-400 bg-cyan-500/20 sci-text-glow":"border-cyan-500/15 hover:border-cyan-400/50 bg-cyan-950/30"}`}>
                       <div className="text-lg mb-0.5">{r.icon}</div>
-                      <div className="font-bold text-[11px] leading-tight">{r.name}</div>
-                      <div className="text-[9px] text-white/40 mt-0.5 leading-tight">{r.bonus.split(",")[0]}</div>
+                      <div className="font-bold text-[11px] leading-tight text-cyan-100">{r.name}</div>
+                      <div className="text-[9px] text-cyan-300/50 mt-0.5 leading-tight">{r.bonus.split(",")[0]}</div>
                     </button>
                   ))}
                 </div>
@@ -1107,23 +1114,23 @@ export default function GalacticEmpire() {
             </>}
 
             {authTab==="login" && <div className="mb-3">
-              <label className="text-xs text-slate-400 mb-1 block">Логин</label>
+              <label className="text-[10px] sci-title text-cyan-400/70 mb-1 block">▸ ID</label>
               <input value={form.login} onChange={e=>setForm(f=>({...f,login:e.target.value}))}
-                placeholder="admiral_nova" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-500 transition"/>
+                placeholder="admiral_nova" className="w-full sci-panel-inner rounded px-3 py-2 text-sm sci-mono text-cyan-100 focus:outline-none focus:border-cyan-400 transition placeholder-cyan-700"/>
             </div>}
 
             <div className="mb-4">
-              <label className="text-xs text-slate-400 mb-1 block">Пароль</label>
+              <label className="text-[10px] sci-title text-cyan-400/70 mb-1 block">▸ ACCESS CODE</label>
               <input type="password" value={form.password} onChange={e=>setForm(f=>({...f,password:e.target.value}))}
                 placeholder="••••••••" onKeyDown={e=>e.key==="Enter"&&handleAuth()}
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-500 transition"/>
+                className="w-full sci-panel-inner rounded px-3 py-2 text-sm sci-mono text-cyan-100 focus:outline-none focus:border-cyan-400 transition placeholder-cyan-700"/>
             </div>
 
-            {authErr&&<div className="bg-red-500/20 border border-red-500/30 text-red-300 text-sm rounded-xl px-4 py-2.5 mb-4">{authErr}</div>}
+            {authErr&&<div className="bg-red-500/15 border border-red-500/40 text-red-300 text-xs sci-mono rounded px-3 py-2 mb-4">⚠ {authErr}</div>}
 
             <button onClick={handleAuth} disabled={loading}
-              className="w-full py-3 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 rounded-xl font-bold text-sm transition-all disabled:opacity-50 shadow-lg shadow-blue-500/20">
-              {loading ? "⏳ Загружаем вашу империю..." : authTab==="login" ? "🌌 Войти в галактику" : "🚀 Основать империю"}
+              className="w-full py-3 sci-btn text-sm">
+              {loading ? "▸ INITIALIZING..." : authTab==="login" ? "▸ ACCESS GRANTED" : "▸ FOUND EMPIRE"}
             </button>
           </div>
         </div>
@@ -1153,52 +1160,66 @@ export default function GalacticEmpire() {
   const res = player;
 
   return (
-    <div className={`min-h-screen bg-gradient-to-br ${raceData.bg} text-white flex flex-col`}>
+    <div className="min-h-screen sci-bg text-cyan-50 flex flex-col relative overflow-hidden">
 
       {/* ── ШАПКА ────────────────────────────────────────────────────────────── */}
-      <div className="bg-black/50 backdrop-blur-sm border-b border-white/10 px-3 py-2 sticky top-0 z-40">
+      <div className="sci-panel border-b border-cyan-500/20 px-3 py-2 sticky top-0 z-40 relative">
         <div className="max-w-7xl mx-auto">
           <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2">
-              <span className="text-2xl">{raceData.icon}</span>
+            <div className="flex items-center gap-2.5">
+              <div className="relative">
+                <span className="text-2xl drop-shadow-[0_0_8px_rgba(34,211,238,0.5)]">{raceData.icon}</span>
+                <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 bg-cyan-400 rounded-full sci-pulse border border-cyan-950"/>
+              </div>
               <div>
-                <div className="font-black text-sm leading-tight">
+                <div className="sci-title text-sm leading-tight text-cyan-100 sci-text-glow">
                   {res.nickname}
-                  <span className="text-white/40 font-normal ml-2 text-xs">{res.rank_title}</span>
+                  <span className="text-cyan-400/60 font-normal ml-2 text-[10px] sci-mono">[{res.rank_title}]</span>
                 </div>
-                <div className="text-[10px] text-white/40">{raceData.name} · ⭐{res.score} · 🏛️{res.colonies_count} колоний · ⚔️{res.battles_won}П</div>
+                <div className="text-[10px] sci-mono text-cyan-300/50 flex gap-2 mt-0.5">
+                  <span>{raceData.name}</span>
+                  <span className="text-cyan-500/30">│</span>
+                  <span>★ {res.score}</span>
+                  <span className="text-cyan-500/30">│</span>
+                  <span>⌂ {res.colonies_count}</span>
+                  <span className="text-cyan-500/30">│</span>
+                  <span className="text-emerald-400/70">+{res.battles_won}W</span>
+                </div>
               </div>
             </div>
             <div className="flex items-center gap-2">
-              {res.alliance_id && <span className="text-xs text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-full border border-blue-500/20">🔱 Альянс</span>}
+              {res.alliance_id && <span className="text-[10px] sci-pill px-2 py-0.5 rounded">🔱 ALLIANCE</span>}
               {/* Колокол оповещений */}
               <button onClick={()=>{ setShowEvents(e=>!e); if(!showEvents) loadEvents(); }}
-                className="relative w-8 h-8 bg-white/5 hover:bg-white/15 rounded-lg flex items-center justify-center transition">
+                className="relative w-8 h-8 sci-panel-inner hover:bg-cyan-500/15 rounded flex items-center justify-center transition">
                 🔔
                 {unreadEvents>0 && (
-                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full text-[9px] font-black flex items-center justify-center animate-pulse">
+                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full text-[9px] font-black flex items-center justify-center animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.6)]">
                     {unreadEvents>9?"9+":unreadEvents}
                   </span>
                 )}
               </button>
-              <button onClick={logout} className="text-xs text-white/30 hover:text-white/70 transition px-2 py-1 rounded hover:bg-white/10">Выйти</button>
+              <button onClick={logout} className="text-[10px] sci-mono text-cyan-400/40 hover:text-cyan-300 transition px-2 py-1 rounded hover:bg-cyan-500/10">[ EXIT ]</button>
             </div>
           </div>
 
-          {/* Ресурсы */}
-          <div className="flex gap-2 overflow-x-auto pb-0.5">
+          {/* Ресурсы — HUD блоки */}
+          <div className="flex gap-1.5 overflow-x-auto pb-0.5">
             {[
-              ["⛏️","Металл",    res.metal],
-              ["⚡","Энергия",   res.energy],
-              ["💎","Кристаллы", res.crystals],
-              ["👥","Население", res.population],
-              ["⛽","Топливо",   res.fuel],
-              ["🌑","Т.Материя", res.dark_matter],
-            ].map(([ic,lb,v])=>(
-              <div key={lb as string} className="flex-shrink-0 bg-white/10 rounded-lg px-2.5 py-1 text-center min-w-[60px]">
-                <div className="text-sm">{ic}</div>
-                <div className="font-black text-xs">{Number(v).toLocaleString()}</div>
-                <div className="text-[9px] text-white/40">{lb}</div>
+              ["⛏️","METAL",    res.metal,       "from-amber-500/20 to-amber-700/5 border-amber-500/30 text-amber-300"],
+              ["⚡","ENERGY",   res.energy,      "from-yellow-400/20 to-yellow-700/5 border-yellow-400/30 text-yellow-300"],
+              ["💎","CRYSTAL",  res.crystals,    "from-fuchsia-400/20 to-fuchsia-700/5 border-fuchsia-400/30 text-fuchsia-300"],
+              ["👥","CREW",     res.population,  "from-cyan-400/20 to-cyan-700/5 border-cyan-400/30 text-cyan-300"],
+              ["⛽","FUEL",     res.fuel,        "from-orange-400/20 to-orange-700/5 border-orange-400/30 text-orange-300"],
+              ["🌑","D.MATTER", res.dark_matter, "from-purple-400/20 to-purple-700/5 border-purple-400/30 text-purple-300"],
+            ].map(([ic,lb,v,cl])=>(
+              <div key={lb as string}
+                className={`flex-shrink-0 bg-gradient-to-b ${cl} border rounded-md px-2.5 py-1 min-w-[78px] flex items-center gap-2`}>
+                <span className="text-base leading-none">{ic}</span>
+                <div className="leading-tight">
+                  <div className="sci-mono font-bold text-xs text-white">{Number(v).toLocaleString()}</div>
+                  <div className="text-[8px] sci-title opacity-70">{lb}</div>
+                </div>
               </div>
             ))}
           </div>
@@ -1257,14 +1278,22 @@ export default function GalacticEmpire() {
       )}
 
       {/* ── НАВИГАЦИЯ ─────────────────────────────────────────────────────────── */}
-      <div className="bg-black/30 border-b border-white/10 sticky top-[88px] z-30">
+      <div className="sci-panel border-t border-cyan-500/10 border-b border-cyan-500/20 sticky top-[88px] z-30 relative">
         <div className="max-w-7xl mx-auto flex overflow-x-auto">
           {TABS.map(t=>(
             <button key={t.id} onClick={()=>setTab(t.id)}
-              className={`flex-shrink-0 flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold whitespace-nowrap border-b-2 transition-all relative ${
-                tab===t.id ? "border-blue-400 text-white bg-white/10" : "border-transparent text-white/50 hover:text-white hover:bg-white/5"
+              className={`flex-shrink-0 flex items-center gap-1.5 px-4 py-2.5 text-[11px] sci-title whitespace-nowrap transition-all relative ${
+                tab===t.id
+                  ? "text-cyan-300 sci-text-glow bg-gradient-to-b from-cyan-500/15 to-transparent"
+                  : "text-cyan-100/40 hover:text-cyan-200 hover:bg-cyan-500/5"
               }`}>
-              {t.icon} {t.label}
+              {tab===t.id && (
+                <>
+                  <span className="absolute top-0 left-0 right-0 h-px bg-cyan-400 sci-pulse"/>
+                  <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-1/2 h-[2px] bg-cyan-400"/>
+                </>
+              )}
+              <span className="relative z-10">{t.icon} {t.label}</span>
               {t.id==="quests" && newQuestBadge && (
                 <span className="absolute top-1.5 right-1 w-2 h-2 bg-yellow-400 rounded-full animate-pulse"/>
               )}

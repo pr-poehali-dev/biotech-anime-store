@@ -245,19 +245,16 @@ def handler(event: dict, context) -> dict:
 
             race = p[1]; nickname = p[2]
 
-            # Проверяем что планета в секторе расы игрока и свободна
+            # Проверяем что планета свободна
             cur.execute(f"""
-                SELECT id, pos_x, pos_y, sector FROM {S}.empire_planets
-                WHERE id=%s AND owner_id IS NULL AND ai_fleet_tier = 0
+                SELECT p.id, p.pos_x, p.pos_y, COALESCE(s.sector, 'alpha')
+                FROM {S}.empire_planets p
+                LEFT JOIN {S}.empire_systems s ON s.id = p.star_system_id
+                WHERE p.id=%s AND p.owner_id IS NULL AND p.ai_fleet_tier = 0
             """, (planet_id,))
             planet = cur.fetchone()
             if not planet:
                 return err('Планета недоступна или уже занята')
-
-            # Проверяем что планета в правильном секторе расы
-            expected_sector = race.lower()
-            if planet[3] and planet[3].lower() != expected_sector and planet[3].lower() != 'alpha':
-                pass  # разрешаем если сектор alpha или совпадает с расой
 
             # Создаём столичную колонию
             cur.execute(f"""

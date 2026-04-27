@@ -1,0 +1,12 @@
+{
+  "tests": [
+    {
+      "name": "Get pirates state",
+      "method": "GET",
+      "path": "/?action=state",
+      "expectedStatus": 200,
+      "expectedBody": {"pirates": []},
+      "bodyMatcher": "partial"
+    }
+  ]
+}

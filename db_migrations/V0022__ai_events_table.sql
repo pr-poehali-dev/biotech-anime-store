@@ -1,0 +1,1 @@
+CREATE TABLE IF NOT EXISTS t_p83915249_biotech_anime_store.ai_events (id SERIAL PRIMARY KEY, player_id INTEGER, event_type TEXT NOT NULL, title TEXT NOT NULL, message TEXT NOT NULL, event_data TEXT NOT NULL DEFAULT '{}', is_read BOOLEAN NOT NULL DEFAULT false, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());

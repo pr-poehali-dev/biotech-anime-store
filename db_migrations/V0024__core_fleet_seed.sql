@@ -1,0 +1,1 @@
+INSERT INTO t_p83915249_biotech_anime_store.core_fleet (name, ships, total_attack, total_defense, pos_x, pos_y) VALUES ('Стражи Ядра', '{"titan":3,"dreadnought":5,"battleship":8,"carrier":2}', 9500, 8200, 1200, 1200);

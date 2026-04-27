@@ -2,12 +2,13 @@ import { useState, useEffect, useRef, useCallback } from "react";
 
 // ─── API URLs ─────────────────────────────────────────────────────────────────
 const API = {
-  auth:   "https://functions.poehali.dev/d299b187-7949-45d0-b594-2578e2b6c399",
-  game:   "https://functions.poehali.dev/14999aad-e665-4e7b-b72f-1213f45c0727",
-  battle: "https://functions.poehali.dev/da4e2351-b1f6-48ab-b9cc-694b8f8b5ad3",
-  social: "https://functions.poehali.dev/d3d9291d-49a7-490b-be7a-4a150fc6daad",
-  shop:   "https://functions.poehali.dev/ae459e25-d759-47c3-890f-ad263c5d7871",
-  quests: "https://functions.poehali.dev/f27f29e2-e51e-4ed2-8058-441439fa55e4",
+  auth:    "https://functions.poehali.dev/d299b187-7949-45d0-b594-2578e2b6c399",
+  game:    "https://functions.poehali.dev/14999aad-e665-4e7b-b72f-1213f45c0727",
+  battle:  "https://functions.poehali.dev/da4e2351-b1f6-48ab-b9cc-694b8f8b5ad3",
+  social:  "https://functions.poehali.dev/d3d9291d-49a7-490b-be7a-4a150fc6daad",
+  shop:    "https://functions.poehali.dev/ae459e25-d759-47c3-890f-ad263c5d7871",
+  quests:  "https://functions.poehali.dev/f27f29e2-e51e-4ed2-8058-441439fa55e4",
+  pirates: "https://functions.poehali.dev/8d35835b-a30e-4b34-a815-287ce19569a9",
 };
 
 // ─── РАСЫ (заменены на оригинальные для игры) ─────────────────────────────────
@@ -146,6 +147,10 @@ interface SpyResult { success:boolean; target:string; report:Record<string,unkno
 interface ChatMsg { id:number; player_id:number; nickname:string; race:string; message:string; created_at:string; }
 interface Alliance { id:number; alliance_name:string; alliance_tag:string; emblem:string; alliance_desc:string; members_count:number; total_score:number; leader_name:string; is_recruiting:boolean; }
 interface Quest { id:string; name:string; icon:string; cat:string; desc:string; progress:number; target:number; completed:boolean; claimed:boolean; pct:number; reward:Record<string,number>; }
+interface PirateFleet { id:number; name:string; tier:number; ships:Record<string,number>; attack:number; defense:number; pos_x:number; pos_y:number; status:string; target_player_id:number|null; tech_level:number; }
+interface CoreFleet   { id:number; name:string; ships:Record<string,number>; attack:number; defense:number; pos_x:number; pos_y:number; status:string; target_player_id:number|null; }
+interface PirateWreck { id:number; pos_x:number; pos_y:number; metal:number; energy:number; crystals:number; fuel:number; }
+interface AiEvent     { id:number; type:string; title:string; message:string; data:string; read:boolean; date:string; }
 
 // ─── УТИЛИТЫ ──────────────────────────────────────────────────────────────────
 async function api(url:string, opts?:{method?:string;body?:object;token?:string}) {
@@ -200,6 +205,16 @@ export default function GalacticEmpire() {
   const [battleFleetId,setBattleFleetId]=useState<number|null>(null);
   const [battleLog,setBattleLog]=useState<string[]>([]);
   const [buildMsg,setBuildMsg]=useState("");
+
+  // ── ПИРАТЫ И ЯДРО ─────────────────────────────────────────────────────────
+  const [pirateFleets,  setPirateFleets]  = useState<PirateFleet[]>([]);
+  const [coreFleet,     setCoreFleet]     = useState<CoreFleet|null>(null);
+  const [pirateWrecks,  setPirateWrecks]  = useState<PirateWreck[]>([]);
+  const [aiEvents,      setAiEvents]      = useState<AiEvent[]>([]);
+  const [unreadEvents,  setUnreadEvents]  = useState(0);
+  const [showEvents,    setShowEvents]    = useState(false);
+  const [piratesMsg,    setPiratesMsg]    = useState("");
+  const pirateTickRef = useRef<number>(0);
 
   // ── ЕЖЕДНЕВНЫЕ ЗАДАНИЯ ────────────────────────────────────────────────────
   const [quests,       setQuests]       = useState<Quest[]>([]);
@@ -504,6 +519,57 @@ export default function GalacticEmpire() {
     loadQuests();
   }, [phase, tab]);
 
+  // ── ПИРАТЫ: загрузка состояния и тик ─────────────────────────────────────
+  const loadPirateState = useCallback(() => {
+    api(`${API.pirates}?action=state`, {token}).then(d => {
+      if (d.pirates)  setPirateFleets(d.pirates);
+      if (d.core)     setCoreFleet(d.core);
+      if (d.wrecks)   setPirateWrecks(d.wrecks);
+      if (typeof d.unread_events === 'number') setUnreadEvents(d.unread_events);
+    });
+  }, [token]);
+
+  useEffect(() => {
+    if (phase !== "game") return;
+    loadPirateState();
+    // Тик пиратов каждые 30 секунд
+    const doTick = () => {
+      api(API.pirates, {method:"POST", token, body:{action:"tick"}}).then(()=>loadPirateState());
+    };
+    doTick();
+    pirateTickRef.current = window.setInterval(doTick, 30000);
+    return () => clearInterval(pirateTickRef.current);
+  }, [phase]);
+
+  // Загрузка событий
+  const loadEvents = useCallback(() => {
+    api(`${API.pirates}?action=events`, {token}).then(d => {
+      if (d.events) setAiEvents(d.events);
+    });
+  }, [token]);
+
+  const readAllEvents = async () => {
+    await api(API.pirates, {method:"POST", token, body:{action:"read_event"}});
+    setUnreadEvents(0);
+    setAiEvents(e=>e.map(ev=>({...ev, read:true})));
+  };
+
+  const salvageWreck = async (wreck_id:number) => {
+    const d = await api(API.pirates, {method:"POST", token, body:{action:"salvage", wreck_id}});
+    if (d.error) { setPiratesMsg("❌ "+d.error); return; }
+    setPiratesMsg("✅ "+d.message);
+    setPlayer(p=>p?{...p,metal:(p.metal||0)+d.metal,energy:(p.energy||0)+d.energy,
+      crystals:(p.crystals||0)+d.crystals,fuel:(p.fuel||0)+d.fuel}:p);
+    loadPirateState();
+  };
+
+  const requestCoreHelp = async () => {
+    const d = await api(API.pirates, {method:"POST", token, body:{action:"request_core_help"}});
+    if (d.error) { setPiratesMsg("❌ "+d.error); return; }
+    setPiratesMsg("✅ "+d.message);
+    loadPirateState();
+  };
+
   // ── ЗАБРАТЬ НАГРАДУ ───────────────────────────────────────────────────────
   async function claimQuest(quest_id:string) {
     setQuestsMsg("");
@@ -803,8 +869,18 @@ export default function GalacticEmpire() {
                 <div className="text-[10px] text-white/40">{raceData.name} · ⭐{res.score} · 🏛️{res.colonies_count} колоний · ⚔️{res.battles_won}П</div>
               </div>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
               {res.alliance_id && <span className="text-xs text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-full border border-blue-500/20">🔱 Альянс</span>}
+              {/* Колокол оповещений */}
+              <button onClick={()=>{ setShowEvents(e=>!e); if(!showEvents) loadEvents(); }}
+                className="relative w-8 h-8 bg-white/5 hover:bg-white/15 rounded-lg flex items-center justify-center transition">
+                🔔
+                {unreadEvents>0 && (
+                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full text-[9px] font-black flex items-center justify-center animate-pulse">
+                    {unreadEvents>9?"9+":unreadEvents}
+                  </span>
+                )}
+              </button>
               <button onClick={logout} className="text-xs text-white/30 hover:text-white/70 transition px-2 py-1 rounded hover:bg-white/10">Выйти</button>
             </div>
           </div>
@@ -828,6 +904,57 @@ export default function GalacticEmpire() {
           </div>
         </div>
       </div>
+
+      {/* ── ПАНЕЛЬ ОПОВЕЩЕНИЙ ─────────────────────────────────────────────────── */}
+      {showEvents && (
+        <div className="fixed top-[90px] right-3 z-50 w-96 max-h-[70vh] overflow-y-auto bg-slate-900/98 backdrop-blur rounded-2xl border border-white/20 shadow-2xl shadow-black/60">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
+            <div className="font-black text-sm">🔔 Оповещения</div>
+            <div className="flex gap-2">
+              {unreadEvents>0&&<button onClick={readAllEvents} className="text-[10px] text-blue-400 hover:text-blue-300 transition">Прочитать все</button>}
+              <button onClick={()=>setShowEvents(false)} className="text-white/40 hover:text-white transition text-lg leading-none">×</button>
+            </div>
+          </div>
+          {aiEvents.length===0
+            ? <div className="text-center text-white/30 py-8">Нет оповещений</div>
+            : aiEvents.map(ev=>{
+              const icons:Record<string,string> = {
+                pirate_attack:"🚨", core_help:"👑", pirate_defeated:"🏆",
+                wreck_appeared:"💥"
+              };
+              const colors:Record<string,string> = {
+                pirate_attack:"border-red-500/30 bg-red-500/5",
+                core_help:"border-yellow-500/30 bg-yellow-500/5",
+                pirate_defeated:"border-green-500/30 bg-green-500/5",
+                wreck_appeared:"border-amber-500/30 bg-amber-500/5",
+              };
+              return (
+                <div key={ev.id} className={`px-4 py-3 border-b border-white/5 ${ev.read?"opacity-50":""} ${colors[ev.type]||"border-white/10"}`}>
+                  <div className="flex items-start gap-2">
+                    <span className="text-xl flex-shrink-0">{icons[ev.type]||"📋"}</span>
+                    <div className="flex-1">
+                      <div className={`font-bold text-sm ${ev.read?"text-white/60":"text-white"}`}>{ev.title}</div>
+                      <div className="text-[11px] text-white/60 mt-0.5 leading-relaxed">{ev.message}</div>
+                      <div className="text-[9px] text-white/30 mt-1">{new Date(ev.date).toLocaleString("ru")}</div>
+                    </div>
+                    {!ev.read&&<div className="w-2 h-2 rounded-full bg-red-400 flex-shrink-0 mt-1"/>}
+                  </div>
+                </div>
+              );
+            })
+          }
+          {/* Кнопка помощи Ядра */}
+          {pirateFleets.some(pf=>pf.status==='attacking'&&pf.target_player_id===res.id) && (
+            <div className="p-3 border-t border-white/10">
+              <button onClick={requestCoreHelp}
+                className="w-full py-2.5 bg-gradient-to-r from-yellow-700 to-amber-600 hover:from-yellow-600 hover:to-amber-500 rounded-xl text-sm font-black transition shadow-lg shadow-yellow-500/20">
+                👑 Запросить помощь Стражей Ядра
+              </button>
+              {piratesMsg&&<div className={`mt-2 text-xs px-3 py-1 rounded-lg ${piratesMsg.startsWith("✅")?"text-green-400":"text-red-400"}`}>{piratesMsg}</div>}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── НАВИГАЦИЯ ─────────────────────────────────────────────────────────── */}
       <div className="bg-black/30 border-b border-white/10 sticky top-[88px] z-30">
@@ -957,6 +1084,82 @@ export default function GalacticEmpire() {
                       </g>
                     );
                   })}
+
+                  {/* Обломки пиратов — мерцающие жёлтые обломки */}
+                  {pirateWrecks.map(w=>(
+                    <g key={`wreck-${w.id}`} style={{cursor:"pointer"}}
+                      onClick={()=>salvageWreck(w.id)}>
+                      <circle cx={w.pos_x} cy={w.pos_y} r="10" fill="#f59e0b" opacity="0.12"/>
+                      <circle cx={w.pos_x} cy={w.pos_y} r="6"  fill="#f59e0b" opacity="0.25">
+                        <animate attributeName="opacity" values="0.15;0.45;0.15" dur="2s" repeatCount="indefinite"/>
+                      </circle>
+                      <text x={w.pos_x} y={w.pos_y+4} textAnchor="middle" fontSize="8" fill="#fbbf24">💥</text>
+                      <text x={w.pos_x} y={w.pos_y+16} textAnchor="middle" fontSize="6" fill="#f59e0b" opacity="0.8">
+                        обломки
+                      </text>
+                    </g>
+                  ))}
+
+                  {/* Пиратские флоты — красные/оранжевые значки с анимацией при атаке */}
+                  {pirateFleets.map(pf=>{
+                    const isAttacking = pf.status === 'attacking';
+                    const isWrecked   = pf.status === 'wrecked';
+                    if (isWrecked) return null;
+                    const col = isAttacking ? "#ef4444" : "#f97316";
+                    const size = 5 + pf.tier;
+                    return (
+                      <g key={`pirate-${pf.id}`} style={{pointerEvents:"none"}}>
+                        {isAttacking && (
+                          <circle cx={pf.pos_x} cy={pf.pos_y} r={size+8} fill={col} opacity="0.15">
+                            <animate attributeName="r" values={`${size+4};${size+14};${size+4}`} dur="0.8s" repeatCount="indefinite"/>
+                            <animate attributeName="opacity" values="0.2;0.05;0.2" dur="0.8s" repeatCount="indefinite"/>
+                          </circle>
+                        )}
+                        <circle cx={pf.pos_x} cy={pf.pos_y} r={size+2} fill={col} opacity="0.2"/>
+                        <circle cx={pf.pos_x} cy={pf.pos_y} r={size} fill={col} opacity={isAttacking?0.95:0.7}/>
+                        {/* Череп */}
+                        <text x={pf.pos_x} y={pf.pos_y+3} textAnchor="middle" fontSize={size*1.4}
+                          opacity={isAttacking?1:0.8}>☠️</text>
+                        {/* Название при атаке */}
+                        {isAttacking && (
+                          <text x={pf.pos_x} y={pf.pos_y-size-5} textAnchor="middle"
+                            fontSize="7" fill="#ef4444" fontWeight="bold" opacity="0.9">
+                            ⚔️ {pf.name}
+                          </text>
+                        )}
+                      </g>
+                    );
+                  })}
+
+                  {/* Флот Ядра — золотой */}
+                  {coreFleet && (() => {
+                    const cf = coreFleet;
+                    const isMoving = cf.status === 'en_route' || cf.status === 'fighting';
+                    return (
+                      <g key="core-fleet" style={{pointerEvents:"none"}}>
+                        {/* Золотое свечение */}
+                        <circle cx={cf.pos_x} cy={cf.pos_y} r="22" fill="#f59e0b" opacity="0.15">
+                          {isMoving && <animate attributeName="r" values="18;28;18" dur="1.5s" repeatCount="indefinite"/>}
+                        </circle>
+                        <circle cx={cf.pos_x} cy={cf.pos_y} r="15" fill="#f59e0b" opacity="0.25"/>
+                        <circle cx={cf.pos_x} cy={cf.pos_y} r="10" fill="#fbbf24" opacity={isMoving?0.95:0.8}/>
+                        {/* Корона */}
+                        <text x={cf.pos_x} y={cf.pos_y+4} textAnchor="middle" fontSize="12">👑</text>
+                        <text x={cf.pos_x} y={cf.pos_y-18} textAnchor="middle"
+                          fontSize="7" fill="#fbbf24" fontWeight="bold" opacity="0.9">
+                          {isMoving ? "🚀 Стражи летят!" : "Стражи Ядра"}
+                        </text>
+                        {/* Линия маршрута при движении */}
+                        {isMoving && cf.target_player_id && pirateFleets
+                          .filter(pf=>pf.target_player_id===cf.target_player_id && pf.status==='attacking')
+                          .map(pf=>(
+                            <line key="core-route"
+                              x1={cf.pos_x} y1={cf.pos_y} x2={pf.pos_x} y2={pf.pos_y}
+                              stroke="#f59e0b" strokeWidth="1.5" opacity="0.35" strokeDasharray="8 4"/>
+                          ))}
+                      </g>
+                    );
+                  })()}
 
                   {/* Большие ореолы галактик рас — один на каждый уникальный сектор */}
                   {Object.entries(SECTOR_STYLES).map(([sector, s])=>{
@@ -1251,6 +1454,57 @@ export default function GalacticEmpire() {
                   className="text-[10px] text-blue-400 hover:text-blue-300 text-center py-1 transition">
                   Загрузить мои флоты ↓
                 </button>
+              )}
+
+              {/* Статус пиратов — предупреждение при атаке */}
+              {pirateFleets.filter(pf=>pf.status==='attacking'&&pf.target_player_id===res.id).map(pf=>(
+                <div key={`atk-${pf.id}`}
+                  className="bg-red-950/80 border border-red-500/40 rounded-xl p-2.5 flex-shrink-0 animate-pulse">
+                  <div className="font-black text-sm text-red-300 mb-1">🚨 Пираты атакуют!</div>
+                  <div className="text-[10px] text-white/70">
+                    <span className="font-bold">☠️ {pf.name}</span> тир {pf.tier}<br/>
+                    ⚔️{pf.attack} атака · 🛡️{pf.defense} защита
+                  </div>
+                  <button onClick={requestCoreHelp}
+                    className="w-full mt-2 py-1.5 bg-yellow-700 hover:bg-yellow-600 rounded-lg text-[10px] font-black transition">
+                    👑 Помощь Ядра
+                  </button>
+                </div>
+              ))}
+
+              {/* Обломки поблизости */}
+              {pirateWrecks.length>0 && (
+                <div className="bg-amber-950/60 border border-amber-500/30 rounded-xl p-2.5 flex-shrink-0">
+                  <div className="font-bold text-xs text-amber-300 mb-1.5">💥 Обломки пиратов</div>
+                  {pirateWrecks.slice(0,3).map(w=>(
+                    <div key={w.id} className="flex items-center justify-between mb-1 text-[10px]">
+                      <span className="text-white/60">⛏️{w.metal} ⚡{w.energy} 💎{w.crystals}</span>
+                      <button onClick={()=>salvageWreck(w.id)}
+                        className="px-2 py-0.5 bg-amber-700 hover:bg-amber-600 rounded-lg text-[10px] font-bold transition">
+                        Собрать
+                      </button>
+                    </div>
+                  ))}
+                  {piratesMsg&&<div className={`text-[10px] mt-1 ${piratesMsg.startsWith("✅")?"text-green-400":"text-red-400"}`}>{piratesMsg}</div>}
+                </div>
+              )}
+
+              {/* Статус флота Ядра */}
+              {coreFleet && (
+                <div className={`rounded-xl p-2.5 flex-shrink-0 border ${coreFleet.status==='en_route'?"bg-yellow-950/60 border-yellow-500/30 animate-pulse":"bg-slate-800/60 border-white/10"}`}>
+                  <div className="font-bold text-xs text-yellow-300 mb-0.5">👑 Стражи Ядра</div>
+                  <div className="text-[10px] text-white/50">
+                    {coreFleet.status==='guarding'?'🛡️ Охраняют Ядро':
+                     coreFleet.status==='en_route'?'🚀 Летят на помощь!':
+                     coreFleet.status==='fighting'?'⚔️ В бою!':'↩️ Возвращаются'}
+                  </div>
+                  {coreFleet.status==='guarding' && !res.alliance_id && (
+                    <button onClick={requestCoreHelp}
+                      className="w-full mt-1.5 py-1 bg-yellow-800/60 hover:bg-yellow-700 rounded-lg text-[10px] font-bold transition text-yellow-200">
+                      👑 Запросить помощь
+                    </button>
+                  )}
+                </div>
               )}
 
               {/* Выбранная система */}

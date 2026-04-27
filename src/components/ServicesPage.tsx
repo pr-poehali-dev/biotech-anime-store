@@ -187,6 +187,72 @@ export default function ServicesPage({ setPage }: Props) {
         </div>
       </section>
 
+      {/* GEO / CITIES — SEO BLOCK */}
+      <section className="py-10 px-4 bg-gradient-to-br from-blue-50 via-white to-blue-50 border-b border-border">
+        <div className="container mx-auto">
+          <div className="text-center mb-6">
+            <div className="inline-flex items-center gap-2 bg-white border border-blue-200 rounded-full px-4 py-1.5 text-xs font-bold text-blue-700 mb-3">
+              <Icon name="MapPin" size={14} />
+              География работы
+            </div>
+            <h2 className="text-2xl md:text-3xl font-black mb-2" style={{ fontFamily: "Montserrat, sans-serif" }}>
+              Ремонт и обслуживание ПК в Амурской области
+            </h2>
+            <p className="text-muted-foreground text-sm max-w-2xl mx-auto">
+              Выезд мастера и подключение организаций по договору во всех ключевых городах региона.
+              В ближайших планах — расширение по всей России.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 mb-6">
+            {[
+              { city: "Благовещенск", note: "база сервиса" },
+              { city: "Свободный", note: "выезд" },
+              { city: "Белогорск", note: "выезд" },
+              { city: "Тында", note: "выезд" },
+              { city: "Зея", note: "выезд" },
+              { city: "Райчихинск", note: "выезд" },
+              { city: "Шимановск", note: "выезд" },
+              { city: "Сковородино", note: "выезд" },
+              { city: "Завитинск", note: "выезд" },
+              { city: "Циолковский", note: "выезд" },
+              { city: "посёлок Прогресс", note: "выезд" },
+              { city: "Ивановка", note: "выезд" },
+            ].map((item) => (
+              <div
+                key={item.city}
+                className="bg-white border border-border rounded-xl px-3 py-2.5 text-center card-hover"
+              >
+                <div className="font-bold text-sm text-foreground">{item.city}</div>
+                <div className="text-[11px] text-muted-foreground mt-0.5">{item.note}</div>
+              </div>
+            ))}
+          </div>
+
+          <div className="bg-white rounded-2xl border border-border p-5 flex flex-col md:flex-row items-start md:items-center gap-4">
+            <div className="w-12 h-12 rounded-2xl hero-gradient flex items-center justify-center shrink-0">
+              <Icon name="Rocket" size={22} className="text-white" />
+            </div>
+            <div className="flex-1">
+              <div className="font-black text-base mb-1" style={{ fontFamily: "Montserrat, sans-serif" }}>
+                Скоро — обслуживание по всей России
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Готовим запуск удалённой IT-поддержки и партнёрской сети инженеров в других регионах:
+                Хабаровский и Приморский края, Якутия, Забайкалье, Москва, Санкт-Петербург и далее.
+                Хотите подключить свою компанию первыми — оставьте заявку.
+              </p>
+            </div>
+            <button
+              onClick={() => { setActiveTab("business"); setTimeout(() => document.getElementById("request-form")?.scrollIntoView({ behavior: "smooth" }), 100); }}
+              className="bear-btn bg-primary text-primary-foreground font-bold text-sm px-5 py-2.5 rounded-xl whitespace-nowrap"
+            >
+              Оставить заявку
+            </button>
+          </div>
+        </div>
+      </section>
+
       {/* PERSONAL SERVICES */}
       {activeTab === "personal" && (
         <section className="py-10 px-4">

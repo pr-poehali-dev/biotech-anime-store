@@ -290,7 +290,7 @@ export default function GalacticEmpire() {
   useEffect(() => {
     if (!token) return;
     api(`${API.auth}?action=me`, {token}).then(d => {
-      if (d.id) { setPlayer(d); setPhase("game"); }
+      if (d.player?.id) { setPlayer(d.player); setPhase("game"); }
       else { localStorage.removeItem("ge_token"); setToken(""); }
     }).catch(()=>{});
   }, []);
@@ -1012,7 +1012,8 @@ export default function GalacticEmpire() {
     {id:"quests",    label:"Задания",   icon:"📋"},
   ];
 
-  const res = player!;
+  if (!player) return null;
+  const res = player;
 
   return (
     <div className={`min-h-screen bg-gradient-to-br ${raceData.bg} text-white flex flex-col`}>

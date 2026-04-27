@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import Shipyard from "./Shipyard";
 
 // ─── API URLs ─────────────────────────────────────────────────────────────────
 const API = {
@@ -12,37 +13,39 @@ const API = {
   station: "https://functions.poehali.dev/fe75129b-929c-4fc0-9d1b-ad45707f5526",
 };
 
-// ─── РАСЫ (заменены на оригинальные для игры) ─────────────────────────────────
+// ─── ФРАКЦИИ «Орбита: Изгои» ─────────────────────────────────
+// 4 оригинальные фракции вместо рас. Старые id (solarians/ironborn/voidstalkers/hiveborn) сохранены
+// для совместимости с БД, но имена/описания/иконки полностью обновлены.
 const RACES = {
-  solarians:   { name: "Соляриане",    icon: "☀️", color: "#f59e0b", desc: "Дети звёзд. Мастера энергии и торговли.",           bonus: "Энергия ×2, торговые маршруты +50%",       bg: "from-amber-900 via-yellow-800 to-slate-950"  },
-  voidstalkers:{ name: "Пожиратели Пустоты", icon: "🌑", color: "#8b5cf6", desc: "Существа из межзвёздной тьмы. Боевые мастера.", bonus: "Атака флота ×1.5, скрытность +100%",      bg: "from-violet-900 via-purple-800 to-slate-950" },
-  ironborn:    { name: "Железнорождённые", icon: "⚙️", color: "#6b7280", desc: "Кибернетическая раса. Добыча и строительство.",  bonus: "Металл ×2.5, строительство -30% времени", bg: "from-slate-800 via-zinc-700 to-slate-950"    },
-  arboreals:   { name: "Арборейцы",    icon: "🌿", color: "#10b981", desc: "Живые деревья-космолёты. Регенерация и рост.",       bonus: "Население ×2, здания регенерируют HP",    bg: "from-emerald-900 via-green-800 to-slate-950" },
-  deepones:    { name: "Глубинники",   icon: "🐙", color: "#06b6d4", desc: "Разум из глубин океанов. Телепатия и шпионаж.",     bonus: "Шпионаж ×3, все технологии -20% стоимость",bg: "from-cyan-900 via-teal-800 to-slate-950"     },
-  wraithkin:   { name: "Призрачники",  icon: "👻", color: "#f9fafb", desc: "Полупрозрачные сущности. Нематериальный флот.",      bonus: "Защита ×1.8, уклонение +40%",             bg: "from-gray-800 via-slate-700 to-slate-950"    },
-  psionic:     { name: "Псионики",     icon: "🔮", color: "#ec4899", desc: "Телепаты и предсказатели. Власть над разумом.",      bonus: "Тёмная материя ×3, все технологии сильнее",bg: "from-pink-900 via-rose-800 to-slate-950"     },
-  hiveborn:    { name: "Роевые",       icon: "🐝", color: "#eab308", desc: "Единый разум миллиардов существ. Численность.",      bonus: "Флот стоит -40%, лимит флота ×2",         bg: "from-yellow-900 via-lime-800 to-slate-950"   },
-  titanforge:  { name: "Титаноковы",   icon: "🔥", color: "#ef4444", desc: "Расплавленные существа из ядра планеты. Мощь.",     bonus: "Производство всего ×1.3, Титаны ×2 силы", bg: "from-red-900 via-orange-800 to-slate-950"    },
+  solarians:   { name: "Аврорианцы",      icon: "🌅", color: "#22d3ee", desc: "Колониальный союз торговых картелей. Скорость и связь.",  bonus: "Плазма ×2, торговые трассы +50%",                bg: "from-cyan-900 via-sky-800 to-slate-950"      },
+  ironborn:    { name: "Стальной Конклав",icon: "⚙️", color: "#94a3b8", desc: "Промышленная коалиция верфей. Тяжёлая броня и добыча.", bonus: "Титанит ×2.5, постройка кораблей быстрее на 30%",bg: "from-slate-800 via-zinc-700 to-slate-950"   },
+  voidstalkers:{ name: "Чёрный Орден",    icon: "🛡️", color: "#a78bfa", desc: "Военная хунта изгоев. Скрытность и удар.",               bonus: "Урон флота ×1.5, маскировка +100%",              bg: "from-violet-900 via-indigo-800 to-slate-950" },
+  hiveborn:    { name: "Рой Гелиос",      icon: "🐝", color: "#facc15", desc: "Бионический рой беспилотников. Численность.",             bonus: "Корабли стоят -40%, лимит флота ×2",             bg: "from-yellow-900 via-amber-800 to-slate-950"  },
 };
 
 type RaceId = keyof typeof RACES;
-type TabId = "galaxy"|"colony"|"fleet"|"tech"|"battle"|"chat"|"alliance"|"diplomacy"|"trade"|"ranking"|"shop"|"quests";
+type TabId = "galaxy"|"colony"|"fleet"|"tech"|"battle"|"chat"|"alliance"|"diplomacy"|"trade"|"ranking"|"shop"|"quests"|"shipyard";
 
-// ─── ГАЛАКТИКИ РАС (секторы на карте) ─────────────────────────────────────────
+// Fallback для устаревших ID рас из старых записей БД
+const RACE_FALLBACK = { name: "Изгой", icon: "🛰️", color: "#94a3b8", desc: "Безродный пилот.", bonus: "—", bg: "from-slate-800 via-slate-900 to-slate-950" };
+const getRace = (id: string) => (RACES as Record<string, typeof RACE_FALLBACK>)[id] || RACE_FALLBACK;
+
+// ─── СЕКТОРА КАРТЫ «Орбита: Изгои» ────────────────────────────────────────────
 const SECTOR_STYLES: Record<string,{color:string;label:string;icon:string}> = {
-  core:         { color:"#a78bfa", label:"Ядро ИИ",          icon:"🤖" },
-  solarians:    { color:"#f59e0b", label:"Галактика Солярин", icon:"☀️" },
-  voidstalkers: { color:"#8b5cf6", label:"Тёмная Бездна",    icon:"🌑" },
-  ironborn:     { color:"#6b7280", label:"Кузница Железа",   icon:"⚙️" },
-  arboreals:    { color:"#10b981", label:"Лесной Мир",       icon:"🌿" },
-  deepones:     { color:"#06b6d4", label:"Глубины Океана",   icon:"🐙" },
-  wraithkin:    { color:"#f1f5f9", label:"Призрачная Мгла",  icon:"👻" },
-  psionic:      { color:"#ec4899", label:"Разум Пустоты",    icon:"🔮" },
-  hiveborn:     { color:"#eab308", label:"Рой Улья",         icon:"🐝" },
-  titanforge:   { color:"#ef4444", label:"Ядро Титанов",     icon:"🔥" },
-  alpha:        { color:"#60a5fa", label:"Сектор Альфа",     icon:"⭐" },
-  beta:         { color:"#34d399", label:"Сектор Бета",      icon:"⭐" },
-  gamma:        { color:"#fb923c", label:"Сектор Гамма",     icon:"⭐" },
+  core:         { color:"#ef4444", label:"Цитадель Корсаров",icon:"☠️" },
+  solarians:    { color:"#22d3ee", label:"Дрейф Аврорианцев",icon:"🌅" },
+  voidstalkers: { color:"#a78bfa", label:"Зона Чёрного Ордена", icon:"🛡️" },
+  ironborn:     { color:"#94a3b8", label:"Верфи Конклава",    icon:"⚙️" },
+  hiveborn:     { color:"#facc15", label:"Кластер Гелиоса",   icon:"🐝" },
+  // Резерв для секторов с других id (совместимость со старой картой)
+  arboreals:    { color:"#10b981", label:"Зелёная Зона",      icon:"🌿" },
+  deepones:     { color:"#06b6d4", label:"Глубинный Дрейф",   icon:"🌀" },
+  wraithkin:    { color:"#f1f5f9", label:"Туманность Призрака",icon:"👻" },
+  psionic:      { color:"#ec4899", label:"Псион-Поле",        icon:"🔮" },
+  titanforge:   { color:"#ef4444", label:"Раскол Титана",     icon:"🔥" },
+  alpha:        { color:"#60a5fa", label:"Сектор Альфа",      icon:"⭐" },
+  beta:         { color:"#34d399", label:"Сектор Бета",       icon:"⭐" },
+  gamma:        { color:"#fb923c", label:"Сектор Гамма",      icon:"⭐" },
 };
 
 // ─── ДОБЫВАЮЩИЕ КОРАБЛИ ───────────────────────────────────────────────────────
@@ -324,7 +327,7 @@ export default function GalacticEmpire() {
   const [spyResult, setSpyResult] = useState<SpyResult|null>(null);
   const [spyLoading, setSpyLoading] = useState(false);
 
-  const raceData = (player ? RACES[player.race as RaceId] : null) ?? RACES.solarians;
+  const raceData = player ? getRace(player.race) : RACES.solarians;
 
   // ── АВТО-ВХОД ──────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -977,7 +980,7 @@ export default function GalacticEmpire() {
   // ЭКРАН ВЫБОРА СТАРТОВОЙ ПЛАНЕТЫ
   // ═══════════════════════════════════════════════════════════════════════════
   if (phase==="choose_planet") {
-    const raceData = RACES[pendingRace] || {icon:"🌌", name:pendingRace};
+    const raceData = getRace(pendingRace);
     return (
       <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center p-4">
         <div className="max-w-2xl w-full bg-slate-900/80 backdrop-blur rounded-2xl p-6 border border-white/10 shadow-2xl">
@@ -1057,19 +1060,24 @@ export default function GalacticEmpire() {
           {/* Заголовок */}
           <div className="text-center mb-8">
             <div className="inline-flex items-center justify-center mb-4">
-              <span className="text-6xl drop-shadow-[0_0_20px_rgba(34,211,238,0.5)]">🌌</span>
+              <span className="text-6xl drop-shadow-[0_0_20px_rgba(34,211,238,0.5)]">🛰️</span>
             </div>
             <div className="sci-divider mb-3"/>
             <h1 className="text-4xl sci-title font-black mb-2 text-cyan-200 sci-text-glow">
-              ГАЛАКТИЧЕСКАЯ<br/>ИМПЕРИЯ
+              ОРБИТА<br/>
+              <span className="text-cyan-400">: ИЗГОИ</span>
             </h1>
             <div className="sci-divider mt-3 mb-3"/>
-            <p className="sci-mono text-xs text-cyan-400/70 tracking-widest">REAL-TIME · 9 RACES · ∞ WORLDS</p>
+            <p className="sci-mono text-xs text-cyan-400/70 tracking-widest">КОСМИЧЕСКАЯ MMO · 4 ФРАКЦИИ · РЕАЛЬНОЕ ВРЕМЯ</p>
             <div className="flex justify-center flex-wrap gap-x-3 gap-y-1 mt-4 text-[10px] sci-mono text-cyan-300/50">
-              {["[ COLONIZE ]","[ COMBAT ]","[ ALLIANCE ]","[ RESEARCH ]"].map(f=>(
+              {["[ КОЛОНИЗАЦИЯ ]","[ ВЕРФЬ ]","[ АЛЬЯНС ]","[ ВОЙНА ]"].map(f=>(
                 <span key={f}>{f}</span>
               ))}
             </div>
+            <p className="text-[10px] text-cyan-300/40 mt-3 max-w-sm mx-auto leading-relaxed">
+              После Великого Распада объединённое человечество раскололось на четыре фракции изгоев.
+              В сердце сектора — <span className="text-red-400">Цитадель Корсаров</span>, охраняющая залежи антиматерии.
+            </p>
           </div>
 
           <div className="sci-panel rounded-md p-6 sci-corner relative">
@@ -1077,30 +1085,30 @@ export default function GalacticEmpire() {
               {(["login","register"] as const).map(m=>(
                 <button key={m} onClick={()=>setAuthTab(m)}
                   className={`flex-1 py-2.5 sci-btn text-xs ${authTab===m?"!bg-cyan-500/30 !border-cyan-400 !text-cyan-100":""}`}>
-                  {m==="login"?"АВТОРИЗАЦИЯ":"РЕГИСТРАЦИЯ"}
+                  {m==="login"?"ВХОД":"РЕГИСТРАЦИЯ"}
                 </button>
               ))}
             </div>
 
             {authTab==="register" && <>
               <div className="mb-3">
-                <label className="text-[10px] sci-title text-cyan-400/70 mb-1 block">▸ E-MAIL</label>
+                <label className="text-[10px] sci-title text-cyan-400/70 mb-1 block">▸ ПОЧТА</label>
                 <input type="email" value={form.email} onChange={e=>setForm(f=>({...f,email:e.target.value}))}
-                  placeholder="commander@galaxy.net" className="w-full sci-panel-inner rounded px-3 py-2 text-sm sci-mono text-cyan-100 focus:outline-none focus:border-cyan-400 transition placeholder-cyan-700"/>
+                  placeholder="pilot@orbita.net" className="w-full sci-panel-inner rounded px-3 py-2 text-sm sci-mono text-cyan-100 focus:outline-none focus:border-cyan-400 transition placeholder-cyan-700"/>
               </div>
               <div className="mb-3">
-                <label className="text-[10px] sci-title text-cyan-400/70 mb-1 block">▸ ID</label>
+                <label className="text-[10px] sci-title text-cyan-400/70 mb-1 block">▸ ЛОГИН</label>
                 <input value={form.login} onChange={e=>setForm(f=>({...f,login:e.target.value}))}
                   placeholder="admiral_nova" className="w-full sci-panel-inner rounded px-3 py-2 text-sm sci-mono text-cyan-100 focus:outline-none focus:border-cyan-400 transition placeholder-cyan-700"/>
               </div>
               <div className="mb-3">
-                <label className="text-[10px] sci-title text-cyan-400/70 mb-1 block">▸ CALL SIGN</label>
+                <label className="text-[10px] sci-title text-cyan-400/70 mb-1 block">▸ ПОЗЫВНОЙ</label>
                 <input value={form.nickname} onChange={e=>setForm(f=>({...f,nickname:e.target.value}))}
                   placeholder="Адмирал Нова" className="w-full sci-panel-inner rounded px-3 py-2 text-sm sci-mono text-cyan-100 focus:outline-none focus:border-cyan-400 transition placeholder-cyan-700"/>
               </div>
               <div className="mb-4">
-                <label className="text-[10px] sci-title text-cyan-400/70 mb-2 block">▸ FACTION SELECT</label>
-                <div className="grid grid-cols-3 gap-1.5">
+                <label className="text-[10px] sci-title text-cyan-400/70 mb-2 block">▸ ВЫБОР ФРАКЦИИ</label>
+                <div className="grid grid-cols-2 gap-1.5">
                   {(Object.entries(RACES) as [RaceId,typeof RACES[RaceId]][]).map(([id,r])=>(
                     <button key={id} onClick={()=>setForm(f=>({...f,race:id}))}
                       className={`text-left px-2 py-2 rounded border text-xs transition-all ${form.race===id?"border-cyan-400 bg-cyan-500/20 sci-text-glow":"border-cyan-500/15 hover:border-cyan-400/50 bg-cyan-950/30"}`}>
@@ -1114,13 +1122,13 @@ export default function GalacticEmpire() {
             </>}
 
             {authTab==="login" && <div className="mb-3">
-              <label className="text-[10px] sci-title text-cyan-400/70 mb-1 block">▸ ID</label>
+              <label className="text-[10px] sci-title text-cyan-400/70 mb-1 block">▸ ЛОГИН</label>
               <input value={form.login} onChange={e=>setForm(f=>({...f,login:e.target.value}))}
                 placeholder="admiral_nova" className="w-full sci-panel-inner rounded px-3 py-2 text-sm sci-mono text-cyan-100 focus:outline-none focus:border-cyan-400 transition placeholder-cyan-700"/>
             </div>}
 
             <div className="mb-4">
-              <label className="text-[10px] sci-title text-cyan-400/70 mb-1 block">▸ ACCESS CODE</label>
+              <label className="text-[10px] sci-title text-cyan-400/70 mb-1 block">▸ КОД ДОСТУПА</label>
               <input type="password" value={form.password} onChange={e=>setForm(f=>({...f,password:e.target.value}))}
                 placeholder="••••••••" onKeyDown={e=>e.key==="Enter"&&handleAuth()}
                 className="w-full sci-panel-inner rounded px-3 py-2 text-sm sci-mono text-cyan-100 focus:outline-none focus:border-cyan-400 transition placeholder-cyan-700"/>
@@ -1130,7 +1138,7 @@ export default function GalacticEmpire() {
 
             <button onClick={handleAuth} disabled={loading}
               className="w-full py-3 sci-btn text-sm">
-              {loading ? "▸ INITIALIZING..." : authTab==="login" ? "▸ ACCESS GRANTED" : "▸ FOUND EMPIRE"}
+              {loading ? "▸ ИНИЦИАЛИЗАЦИЯ..." : authTab==="login" ? "▸ ВОЙТИ В СЕКТОР" : "▸ СТАТЬ ИЗГОЕМ"}
             </button>
           </div>
         </div>
@@ -1142,8 +1150,9 @@ export default function GalacticEmpire() {
   // ОСНОВНАЯ ИГРА
   // ═══════════════════════════════════════════════════════════════════════════
   const TABS: {id:TabId;label:string;icon:string}[] = [
-    {id:"galaxy",    label:"Галактика", icon:"🌌"},
-    {id:"colony",    label:"Колонии",   icon:"🏗️"},
+    {id:"galaxy",    label:"Сектор",    icon:"🌌"},
+    {id:"colony",    label:"База",      icon:"🏗️"},
+    {id:"shipyard",  label:"Верфь",     icon:"🛠️"},
     {id:"fleet",     label:"Флот",      icon:"🚀"},
     {id:"tech",      label:"Технологии",icon:"🔬"},
     {id:"battle",    label:"Битвы",     icon:"⚔️"},
@@ -1203,18 +1212,18 @@ export default function GalacticEmpire() {
             </div>
           </div>
 
-          {/* Ресурсы — HUD блоки */}
+          {/* Ресурсы — HUD блоки «Орбита: Изгои» */}
           <div className="flex gap-1.5 overflow-x-auto pb-0.5">
             {[
-              ["⛏️","METAL",    res.metal,       "from-amber-500/20 to-amber-700/5 border-amber-500/30 text-amber-300"],
-              ["⚡","ENERGY",   res.energy,      "from-yellow-400/20 to-yellow-700/5 border-yellow-400/30 text-yellow-300"],
-              ["💎","CRYSTAL",  res.crystals,    "from-fuchsia-400/20 to-fuchsia-700/5 border-fuchsia-400/30 text-fuchsia-300"],
-              ["👥","CREW",     res.population,  "from-cyan-400/20 to-cyan-700/5 border-cyan-400/30 text-cyan-300"],
-              ["⛽","FUEL",     res.fuel,        "from-orange-400/20 to-orange-700/5 border-orange-400/30 text-orange-300"],
-              ["🌑","D.MATTER", res.dark_matter, "from-purple-400/20 to-purple-700/5 border-purple-400/30 text-purple-300"],
+              ["⛏️","ТИТАНИТ",     res.metal,       "from-amber-500/20 to-amber-700/5 border-amber-500/30 text-amber-300"],
+              ["⚡","ПЛАЗМА",      res.energy,      "from-yellow-400/20 to-yellow-700/5 border-yellow-400/30 text-yellow-300"],
+              ["💎","ИЗОКРИСТАЛЛ", res.crystals,    "from-fuchsia-400/20 to-fuchsia-700/5 border-fuchsia-400/30 text-fuchsia-300"],
+              ["👥","ЭКИПАЖ",      res.population,  "from-cyan-400/20 to-cyan-700/5 border-cyan-400/30 text-cyan-300"],
+              ["⛽","ТОПЛИВО",     res.fuel,        "from-orange-400/20 to-orange-700/5 border-orange-400/30 text-orange-300"],
+              ["🌑","АНТИМАТЕРИЯ", res.dark_matter, "from-purple-400/20 to-purple-700/5 border-purple-400/30 text-purple-300"],
             ].map(([ic,lb,v,cl])=>(
               <div key={lb as string}
-                className={`flex-shrink-0 bg-gradient-to-b ${cl} border rounded-md px-2.5 py-1 min-w-[78px] flex items-center gap-2`}>
+                className={`flex-shrink-0 bg-gradient-to-b ${cl} border rounded-md px-2.5 py-1 min-w-[100px] flex items-center gap-2`}>
                 <span className="text-base leading-none">{ic}</span>
                 <div className="leading-tight">
                   <div className="sci-mono font-bold text-xs text-white">{Number(v).toLocaleString()}</div>
@@ -1314,9 +1323,9 @@ export default function GalacticEmpire() {
               {/* Подсказка управления */}
               <div className="absolute top-2 left-2 z-20 flex items-center gap-2 flex-wrap">
                 <div className="sci-panel rounded px-3 py-1.5 text-[10px] sci-mono text-cyan-300/70 flex items-center gap-2 sci-corner">
-                  <span>◇ DRAG</span><span className="text-cyan-500/40">│</span>
-                  <span>◇ ZOOM</span><span className="text-cyan-500/40">│</span>
-                  <span className="text-cyan-200">{systems.length} SYS</span>
+                  <span>◇ ТАЩИ</span><span className="text-cyan-500/40">│</span>
+                  <span>◇ ЗУМ</span><span className="text-cyan-500/40">│</span>
+                  <span className="text-cyan-200">{systems.length} СИС</span>
                 </div>
                 {/* Кнопка Моя колония */}
                 {res.home_planet_id && (
@@ -1332,7 +1341,7 @@ export default function GalacticEmpire() {
                     }
                   }}
                   className="sci-btn sci-btn-success rounded px-3 py-1.5 text-[10px] flex items-center gap-1.5">
-                    🏠 HOME BASE
+                    🏠 МОЯ БАЗА
                   </button>
                 )}
               </div>
@@ -1376,12 +1385,12 @@ export default function GalacticEmpire() {
 
               {/* Легенда */}
               <div className="absolute bottom-2 left-2 z-20 flex items-center gap-3 sci-panel rounded px-3 py-1.5 text-[9px] sci-mono text-cyan-300/70 sci-corner">
-                <span><span className="text-emerald-400 sci-text-glow">◆</span> ALLY</span>
-                <span><span className="text-red-400">◆</span> AI</span>
-                <span><span className="text-amber-300">◆</span> PLAYER</span>
-                <span><span className="text-cyan-300/40">◇</span> NEUTRAL</span>
-                <span><span className="text-cyan-300">▸</span> FLEET</span>
-                <span><span className="text-red-400">▸</span> HOSTILE</span>
+                <span><span className="text-emerald-400 sci-text-glow">◆</span> МОЯ</span>
+                <span><span className="text-red-400">◆</span> ИИ</span>
+                <span><span className="text-amber-300">◆</span> ИГРОК</span>
+                <span><span className="text-cyan-300/40">◇</span> НЕЙТРАЛ</span>
+                <span><span className="text-cyan-300">▸</span> ФЛОТ</span>
+                <span><span className="text-red-400">▸</span> ВРАГ</span>
               </div>
 
               {/* Угловые маркеры HUD */}
@@ -1391,7 +1400,7 @@ export default function GalacticEmpire() {
               <div className="absolute bottom-0 right-0 w-6 h-6 z-10 pointer-events-none border-r-2 border-b-2 border-cyan-400/50"/>
               {/* Координаты в углу */}
               <div className="absolute top-2 left-1/2 -translate-x-1/2 z-10 pointer-events-none sci-mono text-[9px] text-cyan-400/40 tracking-widest">
-                ◤ NAVCOM ─ SECTOR MAP ─ v2.7 ◥
+                ◤ НАВИКОМ ─ КАРТА СЕКТОРА ─ v2.7 ◥
               </div>
               {/* Сканлайн радара */}
               <div className="sci-scan-line"/>
@@ -1527,6 +1536,80 @@ export default function GalacticEmpire() {
                       <circle cx={s.pos_x} cy={s.pos_y} r="80" fill="none" stroke="#22c55e" strokeWidth="0.5" strokeDasharray="2 4" opacity="0.4"/>
                     </g>
                   ))}
+
+                  {/* ════ ЦИТАДЕЛЬ КОРСАРОВ — пиратский босс в центре карты ════ */}
+                  <g pointerEvents="none">
+                    {/* Внешняя зона запретной территории */}
+                    <circle cx="1200" cy="1200" r="250" fill="#ef4444" opacity="0.04"/>
+                    <circle cx="1200" cy="1200" r="250" fill="none" stroke="#ef4444" strokeWidth="0.6" strokeDasharray="6 6" opacity="0.35">
+                      <animate attributeName="stroke-dashoffset" from="0" to="-24" dur="4s" repeatCount="indefinite"/>
+                    </circle>
+                    {/* Опасная зона — обстрел */}
+                    <circle cx="1200" cy="1200" r="160" fill="#dc2626" opacity="0.06"/>
+                    <circle cx="1200" cy="1200" r="160" fill="none" stroke="#f87171" strokeWidth="0.5" strokeDasharray="3 3" opacity="0.5"/>
+                    {/* Залежи антиматерии — оранжевые искры по орбите */}
+                    {Array.from({length:8}).map((_,i)=>{
+                      const a = (i/8)*Math.PI*2;
+                      const r = 200;
+                      const x = 1200 + Math.cos(a)*r;
+                      const y = 1200 + Math.sin(a)*r;
+                      return (
+                        <g key={`am-${i}`}>
+                          <circle cx={x} cy={y} r="4" fill="#a855f7" opacity="0.4">
+                            <animate attributeName="opacity" values="0.2;0.7;0.2" dur="2.5s" begin={`${i*0.3}s`} repeatCount="indefinite"/>
+                          </circle>
+                          <circle cx={x} cy={y} r="2" fill="#c084fc" opacity="0.9"/>
+                        </g>
+                      );
+                    })}
+                    {/* Пульсация ауры боссa */}
+                    <circle cx="1200" cy="1200" r="60" fill="#ef4444" opacity="0.15">
+                      <animate attributeName="r" values="55;75;55" dur="3s" repeatCount="indefinite"/>
+                      <animate attributeName="opacity" values="0.18;0.05;0.18" dur="3s" repeatCount="indefinite"/>
+                    </circle>
+                    {/* Внешняя стена цитадели — шестигранник */}
+                    <polygon
+                      points="1200,1160 1235,1180 1235,1220 1200,1240 1165,1220 1165,1180"
+                      fill="#7f1d1d" opacity="0.85"
+                      stroke="#ef4444" strokeWidth="1.5"/>
+                    {/* Внутренний реактор */}
+                    <circle cx="1200" cy="1200" r="14" fill="#dc2626" opacity="0.95" filter="url(#nodeGlow)"/>
+                    <circle cx="1200" cy="1200" r="7" fill="#fca5a5" opacity="0.95">
+                      <animate attributeName="opacity" values="0.7;1;0.7" dur="1.5s" repeatCount="indefinite"/>
+                    </circle>
+                    {/* Череп */}
+                    <text x="1200" y="1206" textAnchor="middle" fontSize="14" fill="#fff">☠️</text>
+                    {/* Подпись */}
+                    <text x="1200" y="1155" textAnchor="middle"
+                      fill="#fca5a5" fontSize="11" fontFamily="Orbitron, monospace" letterSpacing="3" fontWeight="700"
+                      filter="url(#nodeGlow)">ЦИТАДЕЛЬ КОРСАРОВ</text>
+                    <text x="1200" y="1262" textAnchor="middle"
+                      fill="#a78bfa" fontSize="7" fontFamily="JetBrains Mono, monospace" letterSpacing="2" opacity="0.85">
+                      ◆ ЗАЛЕЖИ АНТИМАТЕРИИ ◆
+                    </text>
+                    <text x="1200" y="1273" textAnchor="middle"
+                      fill="#ef4444" fontSize="6" fontFamily="JetBrains Mono, monospace" letterSpacing="2" opacity="0.7">
+                      ⚠ ОПАСНАЯ ЗОНА ⚠
+                    </text>
+                    {/* Маркер «УГРОЗА» вращается */}
+                    <g>
+                      <animateTransform attributeName="transform" type="rotate"
+                        from="0 1200 1200" to="360 1200 1200" dur="20s" repeatCount="indefinite"/>
+                      {[0,90,180,270].map(a=>{
+                        const rad = a*Math.PI/180;
+                        const x = 1200 + Math.cos(rad)*100;
+                        const y = 1200 + Math.sin(rad)*100;
+                        return (
+                          <g key={`thr-${a}`}>
+                            <line x1={1200+Math.cos(rad)*70} y1={1200+Math.sin(rad)*70}
+                              x2={x} y2={y}
+                              stroke="#ef4444" strokeWidth="1" opacity="0.5"/>
+                            <circle cx={x} cy={y} r="3" fill="#ef4444" opacity="0.8"/>
+                          </g>
+                        );
+                      })}
+                    </g>
+                  </g>
 
                   {/* Анимированные флоты — неоновые трассеры */}
                   {animFleets.map(f=>{
@@ -2364,6 +2447,11 @@ export default function GalacticEmpire() {
           </div>
         )}
 
+        {/* ═══════════════ ВЕРФЬ ═══════════════ */}
+        {tab==="shipyard" && (
+          <Shipyard player={player as unknown as { metal:number; energy:number; crystals:number; population:number }}/>
+        )}
+
         {/* ═══════════════ КОЛОНИИ ═══════════════ */}
         {tab==="colony" && (
           <div>
@@ -2669,7 +2757,7 @@ export default function GalacticEmpire() {
               {chatMsgs.map(m=>(
                 <div key={m.id} className={`flex gap-2 ${m.player_id===res.id?"flex-row-reverse":""}`}>
                   <div className={`rounded-2xl px-3 py-2 max-w-[80%] text-sm ${m.player_id===res.id?"bg-blue-600/50":"bg-white/10"}`}>
-                    <div className="text-[9px] text-white/40 mb-0.5">{RACES[m.race as RaceId]?.icon||"👤"} {m.nickname}</div>
+                    <div className="text-[9px] text-white/40 mb-0.5">{getRace(m.race).icon} {m.nickname}</div>
                     {m.message}
                   </div>
                 </div>
@@ -2761,7 +2849,7 @@ export default function GalacticEmpire() {
                   className="w-full bg-white/10 border border-white/10 rounded-xl px-3 py-2 text-sm mb-2">
                   <option value="">— выбрать игрока —</option>
                   {diploPlayers.filter(p=>p.id!==res.id).map(p=>(
-                    <option key={p.id} value={p.id}>{RACES[p.race as RaceId]?.icon||"👤"} {p.nickname} (⭐{p.score})</option>
+                    <option key={p.id} value={p.id}>{getRace(p.race).icon} {p.nickname} (⭐{p.score})</option>
                   ))}
                 </select>
                 <input value={diploMsg.startsWith("✅")||diploMsg.startsWith("❌")||diploMsg.startsWith("⚔️")||diploMsg.startsWith("🤝")||diploMsg.startsWith("🕊️")?"":diploMsg}
@@ -2783,7 +2871,7 @@ export default function GalacticEmpire() {
                 {diploPlayers.filter(p=>p.id!==res.id).slice(0,10).map(p=>(
                   <div key={p.id} className="bg-white/5 rounded-xl px-3 py-2 border border-white/10 flex items-center justify-between text-sm">
                     <div className="flex items-center gap-2">
-                      <span>{RACES[p.race as RaceId]?.icon||"👤"}</span>
+                      <span>{getRace(p.race).icon}</span>
                       <span className="font-semibold">{p.nickname}</span>
                       <span className="text-[10px] text-white/40">{p.rank}</span>
                     </div>
@@ -2892,7 +2980,7 @@ export default function GalacticEmpire() {
                 <div key={p.id} className={`grid grid-cols-[40px_1fr_80px_60px_60px_80px] gap-2 px-4 py-2.5 border-t border-white/5 text-sm items-center ${p.id===res.id?"bg-blue-500/10":i<3?"bg-yellow-500/5":""}`}>
                   <div className="font-black text-white/50">{i<3?["🥇","🥈","🥉"][i]:i+1}</div>
                   <div className="flex items-center gap-2">
-                    <span>{RACES[p.race as RaceId]?.icon||"👤"}</span>
+                    <span>{getRace(p.race).icon}</span>
                     <span className="font-semibold truncate">{p.nickname}</span>
                     {p.id===res.id&&<span className="text-[10px] text-blue-400">Вы</span>}
                   </div>
@@ -3589,8 +3677,8 @@ export default function GalacticEmpire() {
         </button>
       )}
 
-      <div className="bg-black/40 border-t border-white/10 text-center py-2 text-[10px] text-white/20">
-        Галактическая Империя · 9 рас · Реальное время · Миллиарды миров
+      <div className="bg-black/40 border-t border-cyan-500/10 text-center py-2 text-[10px] text-cyan-400/30 sci-mono tracking-widest">
+        ОРБИТА: ИЗГОИ · 4 ФРАКЦИИ · РЕАЛЬНОЕ ВРЕМЯ · ЦИТАДЕЛЬ КОРСАРОВ ОНЛАЙН
       </div>
     </div>
   );

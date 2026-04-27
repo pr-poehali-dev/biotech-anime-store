@@ -57,16 +57,16 @@ export default function Header({ page, setPage, cartCount }: HeaderProps) {
               </button>
             ))}
 
-            {/* Кнопка Галактическая Империя */}
+            {/* Кнопка Орбита: Изгои */}
             <button
               onClick={() => setPage("game")}
               className={`px-3 py-2 rounded-lg text-sm font-semibold transition-colors ${
                 isGameActive
-                  ? "bg-green-600 text-white"
-                  : "text-green-700 hover:bg-green-50"
+                  ? "bg-cyan-600 text-white"
+                  : "text-cyan-700 hover:bg-cyan-50"
               }`}
             >
-              🌌 Галактическая Империя
+              🛰️ Орбита: Изгои
             </button>
           </nav>
 
@@ -122,14 +122,14 @@ export default function Header({ page, setPage, cartCount }: HeaderProps) {
               </button>
             ))}
 
-            {/* Галактическая Империя в мобильном меню */}
+            {/* Орбита: Изгои в мобильном меню */}
             <button
               onClick={() => { setPage("game"); setMenuOpen(false); }}
               className={`w-full text-left px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors mb-0.5 ${
-                isGameActive ? "bg-green-600 text-white" : "text-green-700 hover:bg-green-50"
+                isGameActive ? "bg-cyan-600 text-white" : "text-cyan-700 hover:bg-cyan-50"
               }`}
             >
-              🌌 Галактическая Империя
+              🛰️ Орбита: Изгои
             </button>
           </div>
         )}

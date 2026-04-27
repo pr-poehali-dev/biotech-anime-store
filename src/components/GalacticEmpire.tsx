@@ -945,46 +945,97 @@ export default function GalacticEmpire() {
                     );
                   })}
 
-                  {/* Ореолы галактик рас */}
-                  {systems.map(sys=>{
-                    const s = SECTOR_STYLES[sys.sector];
-                    if (!s) return null;
-                    const isCore = sys.sector==="core";
-                    // Точный радиус ореола — та же формула что в рендере планет (starR=14, GAP=16, avgPr=8)
-                    const starR2 = (sys.star_size||5)*1.4 + 14;
-                    const GAP2 = 16;
-                    const avgPr = 8;
-                    const n = sys.planet_count || 1;
-                    // cursor после n планет: starR2 + n*(avgPr + GAP2 + avgPr) + GAP2 = последний центр
-                    const maxOrbitR = starR2 + GAP2 + n * (avgPr * 2 + GAP2);
-                    const haloR = Math.max(isCore ? 110 : 70, maxOrbitR + 20);
+                  {/* Большие ореолы галактик рас — один на каждый уникальный сектор */}
+                  {Object.entries(SECTOR_STYLES).map(([sector, s])=>{
+                    const sectorSystems = systems.filter(sy=>sy.sector===sector);
+                    if (!sectorSystems.length) return null;
+                    // Центр галактики расы = среднее по всем системам сектора
+                    const cx = sectorSystems.reduce((a,sy)=>a+sy.pos_x,0)/sectorSystems.length;
+                    const cy = sectorSystems.reduce((a,sy)=>a+sy.pos_y,0)/sectorSystems.length;
+                    const isCore = sector==="core";
+                    // Радиус ореола охватывает все системы + отступ
+                    const maxDist = sectorSystems.reduce((m,sy)=>Math.max(m,Math.hypot(sy.pos_x-cx,sy.pos_y-cy)),0);
+                    const haloR = Math.max(isCore?200:180, maxDist+180);
                     return (
-                      <g key={`halo-${sys.id}`} style={{pointerEvents:"none"}}>
-                        <circle cx={sys.pos_x} cy={sys.pos_y} r={haloR} fill={s.color} opacity={isCore?"0.08":"0.05"}/>
-                        <circle cx={sys.pos_x} cy={sys.pos_y} r={haloR} fill="none" stroke={s.color} strokeWidth={isCore?"1.5":"0.7"} opacity={isCore?"0.45":"0.25"} strokeDasharray={isCore?"":"6 4"}/>
-                        <text x={sys.pos_x} y={sys.pos_y-(haloR+8)} textAnchor="middle" fill={s.color} fontSize="8" opacity="0.65" fontWeight="bold">{s.icon} {s.label}</text>
+                      <g key={`galaxy-halo-${sector}`} style={{pointerEvents:"none"}}>
+                        <circle cx={cx} cy={cy} r={haloR*1.3} fill={s.color} opacity="0.025"/>
+                        <circle cx={cx} cy={cy} r={haloR} fill={s.color} opacity={isCore?"0.07":"0.05"}/>
+                        <circle cx={cx} cy={cy} r={haloR} fill="none" stroke={s.color}
+                          strokeWidth={isCore?"2":"1"}
+                          opacity={isCore?"0.5":"0.3"}
+                          strokeDasharray={isCore?"":"10 6"}/>
+                        <text x={cx} y={cy-haloR-10} textAnchor="middle"
+                          fill={s.color} fontSize="20" opacity="0.7" fontWeight="bold">
+                          {s.icon}
+                        </text>
+                        <text x={cx} y={cy-haloR+10} textAnchor="middle"
+                          fill={s.color} fontSize="11" opacity="0.55" fontWeight="bold">
+                          {s.label}
+                        </text>
                       </g>
                     );
                   })}
 
-                  {/* Звёздные системы */}
+                  {/* Звёздные системы с мини-планетами вокруг них */}
                   {systems.map(sys=>{
                     const isSelected = selSystem?.id===sys.id;
                     const col = STAR_COLORS[sys.star_type] || "#f59e0b";
                     const r = (sys.star_size||5)*1.4+3;
                     const hasMine = planets.some(p=>p.star_system_id===sys.id && p.owner_id===res.id);
                     const sectorStyle = SECTOR_STYLES[sys.sector];
+                    const n = sys.planet_count || 0;
+                    // Мини-орбиты: 3 кольца вокруг звезды для видимости на обзорной карте
+                    // орбиты пропорционально звезде
+                    const miniOrbitStep = r * 1.8 + 6;
+
                     return (
-                      <g key={sys.id} onClick={()=>{ if(!didDrag.current) loadSystem(sys); }} style={{cursor:"pointer"}}>
-                        {hasMine && <circle cx={sys.pos_x} cy={sys.pos_y} r={r+16} fill="none" stroke="#22c55e" strokeWidth="0.8" opacity="0.4" strokeDasharray="3 3"/>}
-                        {sys.sector==="core" && <circle cx={sys.pos_x} cy={sys.pos_y} r={r+20} fill="none" stroke="#a78bfa" strokeWidth="2" opacity="0.6" strokeDasharray="5 3"/>}
-                        {isSelected && <circle cx={sys.pos_x} cy={sys.pos_y} r={r+10} fill="none" stroke={col} strokeWidth="1.5" opacity="0.6" strokeDasharray="4 2"/>}
-                        <circle cx={sys.pos_x} cy={sys.pos_y} r={r+6} fill={sectorStyle?.color||col} opacity="0.1"/>
-                        <circle cx={sys.pos_x} cy={sys.pos_y} r={r+6} fill={col} opacity="0.08"/>
-                        <circle cx={sys.pos_x} cy={sys.pos_y} r={r} fill={col} opacity={isSelected?1:0.85}/>
-                        <circle cx={sys.pos_x-r*0.3} cy={sys.pos_y-r*0.3} r={r*0.25} fill="white" opacity="0.25"/>
-                        <text x={sys.pos_x} y={sys.pos_y+r+9} textAnchor="middle" fill="white" fontSize={7/mapScale+5} opacity="0.65">{sys.name}</text>
-                        <text x={sys.pos_x} y={sys.pos_y+r+17} textAnchor="middle" fill={sectorStyle?.color||col} fontSize={6/mapScale+4} opacity="0.55">{sys.planet_count}🪐</text>
+                      <g key={sys.id}>
+                        {/* Мини-планеты вокруг звезды — видны на обзорной карте */}
+                        {n > 0 && Array.from({length: Math.min(n, 6)}).map((_, pi) => {
+                          const orbitR2 = r + 8 + pi * miniOrbitStep;
+                          const startDeg = (pi / Math.min(n,6)) * 360 - 90;
+                          const period2 = 12 + pi * 8;
+                          const pCol = ["#22c55e","#06b6d4","#f97316","#a78bfa","#f59e0b","#ec4899"][pi % 6];
+                          return (
+                            <g key={`mp-${sys.id}-${pi}`} style={{pointerEvents:"none"}}>
+                              {/* Кольцо орбиты */}
+                              <circle cx={sys.pos_x} cy={sys.pos_y} r={orbitR2}
+                                fill="none" stroke={sectorStyle?.color||"white"}
+                                strokeWidth="0.3" opacity="0.12"/>
+                              {/* Планета с анимацией */}
+                              <circle cx={sys.pos_x} cy={sys.pos_y} r={2.2} fill={pCol} opacity="0.8">
+                                <animateTransform
+                                  attributeName="transform"
+                                  type="rotate"
+                                  from={`${startDeg} ${sys.pos_x} ${sys.pos_y}`}
+                                  to={`${startDeg+360} ${sys.pos_x} ${sys.pos_y}`}
+                                  dur={`${period2}s`}
+                                  repeatCount="indefinite"/>
+                              </circle>
+                              {/* Маленький трейл планеты */}
+                              <circle cx={sys.pos_x} cy={sys.pos_y-orbitR2} r={1.4}
+                                fill={pCol} opacity="0.5"
+                                style={{display:"none"}}>
+                              </circle>
+                            </g>
+                          );
+                        })}
+
+                        {/* Сама звезда — поверх планет */}
+                        <g onClick={()=>{ if(!didDrag.current) loadSystem(sys); }} style={{cursor:"pointer"}}>
+                          {hasMine && <circle cx={sys.pos_x} cy={sys.pos_y} r={r+14} fill="none" stroke="#22c55e" strokeWidth="1" opacity="0.5" strokeDasharray="3 3"/>}
+                          {sys.sector==="core" && <circle cx={sys.pos_x} cy={sys.pos_y} r={r+18} fill="none" stroke="#a78bfa" strokeWidth="1.5" opacity="0.7" strokeDasharray="5 3"/>}
+                          {isSelected && <circle cx={sys.pos_x} cy={sys.pos_y} r={r+10} fill="none" stroke={col} strokeWidth="1.5" opacity="0.8" strokeDasharray="4 2"/>}
+                          {/* Свечение звезды */}
+                          <circle cx={sys.pos_x} cy={sys.pos_y} r={r+5} fill={col} opacity="0.12"/>
+                          {/* Тело звезды */}
+                          <circle cx={sys.pos_x} cy={sys.pos_y} r={r} fill={col} opacity={isSelected?1:0.9}/>
+                          {/* Блик */}
+                          <circle cx={sys.pos_x-r*0.3} cy={sys.pos_y-r*0.3} r={r*0.25} fill="white" opacity="0.3"/>
+                          {/* Название */}
+                          <text x={sys.pos_x} y={sys.pos_y+r+8+n*miniOrbitStep/2} textAnchor="middle"
+                            fill="white" fontSize={6/mapScale+4.5} opacity="0.6">{sys.name}</text>
+                        </g>
                       </g>
                     );
                   })}
@@ -1085,101 +1136,92 @@ export default function GalacticEmpire() {
                 </g>
               </svg>
 
-              {/* ── Мини-карта ─────────────────────────────────────────────── */}
+              {/* ── Мини-карта (кликабельная) ─────────────────────────────── */}
               {(() => {
                 const wrapW = mapWrapRef.current?.clientWidth  || 700;
                 const wrapH = mapWrapRef.current?.clientHeight || 500;
-
-                // Видимая область в координатах мира
-                const viewW = wrapW  / mapScale;
-                const viewH = wrapH  / mapScale;
+                const viewW = wrapW / mapScale;
+                const viewH = wrapH / mapScale;
                 const viewX = -mapTx / mapScale;
                 const viewY = -mapTy / mapScale;
+                const rx = Math.max(0, Math.min(MINI - 4, viewX * miniScale));
+                const ry = Math.max(0, Math.min(MINI - 4, viewY * miniScale));
+                const rw = Math.max(4, Math.min(MINI, viewW * miniScale));
+                const rh = Math.max(4, Math.min(MINI, viewH * miniScale));
 
-                // Позиция и размер viewport-рамки на мини-карте
-                const rx = Math.max(0, viewX * miniScale);
-                const ry = Math.max(0, viewY * miniScale);
-                const rw = Math.min(MINI, viewW * miniScale);
-                const rh = Math.min(MINI, viewH * miniScale);
+                const handleMiniClick = (e: React.MouseEvent<SVGSVGElement>) => {
+                  const svgEl = e.currentTarget;
+                  const rect  = svgEl.getBoundingClientRect();
+                  // Координаты клика в пространстве мини-карты
+                  const mx = e.clientX - rect.left;
+                  const my = e.clientY - rect.top;
+                  // Переводим в мировые координаты
+                  const worldX = mx / miniScale;
+                  const worldY = my / miniScale;
+                  // Центрируем viewport на этой точке
+                  setMapTx(wrapW / 2 - worldX * mapScale);
+                  setMapTy(wrapH / 2 - worldY * mapScale);
+                };
 
                 return (
-                  <div className="absolute bottom-10 right-2 z-20"
-                    style={{width:MINI, height:MINI}}
-                  >
-                    {/* Фон мини-карты */}
+                  <div className="absolute bottom-10 right-2 z-20" style={{width:MINI}}>
                     <svg
                       width={MINI} height={MINI}
                       viewBox={`0 0 ${MINI} ${MINI}`}
-                      className="rounded-xl border border-white/20 bg-slate-950/90 backdrop-blur shadow-xl shadow-black/60"
+                      onClick={handleMiniClick}
+                      className="rounded-xl border border-white/20 bg-slate-950/90 backdrop-blur shadow-xl shadow-black/60 cursor-crosshair"
                       style={{display:"block"}}
                     >
-                      {/* Тёмный фон */}
                       <rect width={MINI} height={MINI} fill="#020617" rx="10"/>
 
-                      {/* Туманности рас — цветные пятна */}
-                      {[
-                        {x:0.08,  y:0.08,  c:"#f59e0b", label:"☀️"},  // solarians
-                        {x:0.83,  y:0.08,  c:"#8b5cf6", label:"🌑"},  // voidstalkers
-                        {x:0.08,  y:0.83,  c:"#6b7280", label:"⚙️"},  // ironborn
-                        {x:0.83,  y:0.83,  c:"#10b981", label:"🌿"},  // arboreals
-                        {x:0.08,  y:0.5,   c:"#06b6d4", label:"🐙"},  // deepones
-                        {x:0.83,  y:0.5,   c:"#f1f5f9", label:"👻"},  // wraithkin
-                        {x:0.5,   y:0.08,  c:"#ec4899", label:"🔮"},  // psionic
-                        {x:0.5,   y:0.83,  c:"#eab308", label:"🐝"},  // hiveborn
-                        {x:0.29,  y:0.29,  c:"#ef4444", label:"🔥"},  // titanforge
-                        {x:0.5,   y:0.5,   c:"#a78bfa", label:"🤖"},  // core AI
-                      ].map((z, i) => (
-                        <g key={i}>
-                          <circle
-                            cx={z.x * MINI} cy={z.y * MINI} r={14}
-                            fill={z.c} opacity="0.18"
-                          />
-                          <text x={z.x*MINI} y={z.y*MINI+4}
-                            textAnchor="middle" fontSize="9" opacity="0.7">
-                            {z.label}
-                          </text>
-                        </g>
-                      ))}
-
-                      {/* Точки систем */}
-                      {systems.map(sys => {
-                        const sx = sys.pos_x * miniScale;
-                        const sy = sys.pos_y * miniScale;
-                        const s  = SECTOR_STYLES[sys.sector];
-                        const col = s?.color || "#94a3b8";
-                        const isHome = planets.some(p => p.id === res.home_planet_id && p.star_system_id === sys.id);
-                        const hasMine = planets.some(p => p.star_system_id === sys.id && p.owner_id === res.id);
+                      {/* Цветные зоны галактик рас — вычисляем из реальных позиций систем */}
+                      {Object.entries(SECTOR_STYLES).map(([sector, s]) => {
+                        const ss = systems.filter(sy => sy.sector === sector);
+                        if (!ss.length) return null;
+                        const cx = ss.reduce((a,sy)=>a+sy.pos_x,0)/ss.length * miniScale;
+                        const cy = ss.reduce((a,sy)=>a+sy.pos_y,0)/ss.length * miniScale;
                         return (
-                          <g key={sys.id}>
-                            {(hasMine || isHome) && (
-                              <circle cx={sx} cy={sy} r={3.5} fill="#22c55e" opacity="0.5"/>
-                            )}
-                            <circle
-                              cx={sx} cy={sy}
-                              r={selSystem?.id === sys.id ? 2.8 : 1.6}
-                              fill={selSystem?.id === sys.id ? "#fff" : col}
-                              opacity={selSystem?.id === sys.id ? 1 : 0.7}
-                            />
+                          <g key={sector}>
+                            <circle cx={cx} cy={cy} r={14} fill={s.color} opacity="0.18"/>
+                            <text x={cx} y={cy+4} textAnchor="middle" fontSize="8" opacity="0.75">{s.icon}</text>
                           </g>
                         );
                       })}
 
-                      {/* Viewport рамка — показывает видимую область */}
-                      <rect
-                        x={rx} y={ry} width={rw} height={rh}
-                        fill="white" fillOpacity="0.06"
-                        stroke="white" strokeWidth="0.8" strokeOpacity="0.5"
-                        rx="2"
-                      />
+                      {/* Точки систем */}
+                      {systems.map(sys => {
+                        const sx  = sys.pos_x * miniScale;
+                        const sy  = sys.pos_y * miniScale;
+                        const s   = SECTOR_STYLES[sys.sector];
+                        const col = s?.color || "#94a3b8";
+                        const isHome = planets.some(p => p.id === res.home_planet_id && p.star_system_id === sys.id);
+                        const hasMine = planets.some(p => p.star_system_id === sys.id && p.owner_id === res.id);
+                        const isSel   = selSystem?.id === sys.id;
+                        return (
+                          <g key={sys.id}>
+                            {(hasMine||isHome) && <circle cx={sx} cy={sy} r={3} fill="#22c55e" opacity="0.5"/>}
+                            <circle cx={sx} cy={sy} r={isSel?2.8:1.5}
+                              fill={isSel?"#fff":col} opacity={isSel?1:0.75}/>
+                          </g>
+                        );
+                      })}
 
-                      {/* Рамка самой мини-карты */}
-                      <rect x="0" y="0" width={MINI} height={MINI}
-                        fill="none" stroke="white" strokeWidth="0.5" strokeOpacity="0.2" rx="10"/>
+                      {/* Viewport рамка */}
+                      <rect x={rx} y={ry} width={rw} height={rh}
+                        fill="white" fillOpacity="0.07"
+                        stroke="white" strokeWidth="1" strokeOpacity="0.6" rx="2"/>
+
+                      {/* Маркер центра видимой области */}
+                      <circle
+                        cx={Math.min(MINI-2, Math.max(2, rx + rw/2))}
+                        cy={Math.min(MINI-2, Math.max(2, ry + rh/2))}
+                        r="2" fill="white" opacity="0.5"/>
+
+                      <rect x="0.5" y="0.5" width={MINI-1} height={MINI-1}
+                        fill="none" stroke="white" strokeWidth="0.5" strokeOpacity="0.15" rx="10"/>
                     </svg>
-
-                    {/* Подпись */}
-                    <div className="text-center text-[8px] text-white/25 mt-0.5 select-none">
-                      Мини-карта
+                    <div className="text-center text-[8px] text-white/25 mt-0.5 select-none tracking-wider">
+                      МИНИ-КАРТА · клик = перейти
                     </div>
                   </div>
                 );

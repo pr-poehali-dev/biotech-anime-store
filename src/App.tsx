@@ -10,12 +10,9 @@ import AdminPage from "@/components/AdminPage";
 import DeliveryPage from "@/components/DeliveryPage";
 import ContactsPage from "@/components/ContactsPage";
 import ServicesPage from "@/components/ServicesPage";
-import GamePage from "@/components/GamePage";
-import Game2Page from "@/components/Game2Page";
-import StarEmpireGame from "@/components/StarEmpireGame";
 import GalacticEmpire from "@/components/GalacticEmpire";
 
-export type Page = "home" | "catalog" | "veterans" | "cart" | "admin" | "delivery" | "contacts" | "services" | "game" | "game2" | "game3" | "game4";
+export type Page = "home" | "catalog" | "veterans" | "cart" | "admin" | "delivery" | "contacts" | "services" | "game";
 
 export type Product = {
   id: number;
@@ -279,10 +276,7 @@ export default function App() {
       case "delivery": return <DeliveryPage />;
       case "contacts": return <ContactsPage />;
       case "services": return <ServicesPage setPage={setPage} />;
-      case "game": return <GamePage />;
-      case "game2": return <Game2Page />;
-      case "game3": return <StarEmpireGame />;
-      case "game4": return <GalacticEmpire />;
+      case "game": return <GalacticEmpire />;
       default: return null;
     }
   };

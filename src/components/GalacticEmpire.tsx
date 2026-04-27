@@ -1157,20 +1157,36 @@ export default function GalacticEmpire() {
                 <button onClick={()=>setMapScale(s=>Math.min(10,s*1.5))} className="w-8 h-8 bg-black/60 hover:bg-white/20 rounded-lg text-white text-base font-black flex items-center justify-center transition">+</button>
                 <button onClick={()=>setMapScale(s=>Math.max(0.1,s*0.67))} className="w-8 h-8 bg-black/60 hover:bg-white/20 rounded-lg text-white text-base font-black flex items-center justify-center transition">−</button>
                 <button onClick={resetMap} className="w-8 h-8 bg-black/60 hover:bg-white/20 rounded-lg text-white text-[10px] flex items-center justify-center transition" title="Вся галактика">🌌</button>
-                <button onClick={()=>{
-                  // Найти домашнюю систему игрока по home_planet_id
-                  const homeP = planets.find(p=>p.id===res.home_planet_id);
-                  const homeSys = homeP ? systems.find(s=>s.id===homeP.star_system_id) : systems.find(s=>s.sector===res.race);
-                  if (homeSys) {
-                    const svgEl = svgRef.current;
-                    const rect = svgEl?.getBoundingClientRect();
-                    const w = rect?.width||600; const h = rect?.height||500;
-                    const scale = 1.2;
-                    setMapScale(scale);
-                    setMapTx(w/2 - homeSys.pos_x * scale);
-                    setMapTy(h/2 - homeSys.pos_y * scale);
+                <button onClick={async ()=>{
+                  const svgEl = svgRef.current;
+                  const rect = svgEl?.getBoundingClientRect();
+                  const w = rect?.width||800; const h = rect?.height||600;
+                  const scale = 2.5;
+
+                  // Ищем домашнюю планету в уже загруженных
+                  let homeP = planets.find(p=>p.id===res.home_planet_id);
+
+                  // Если планеты ещё не загружены — грузим всю галактику
+                  if (!homeP && res.home_planet_id) {
+                    const d = await api(`${API.game}?action=galaxy`, {token});
+                    if (d.planets) {
+                      setPlanets(d.planets);
+                      setSystems(d.systems || systems);
+                      homeP = d.planets.find((p:Planet)=>p.id===res.home_planet_id);
+                    }
                   }
-                }} className="w-8 h-8 bg-black/60 hover:bg-white/20 rounded-lg text-white text-sm flex items-center justify-center transition" title="К моей планете">🏠</button>
+
+                  if (homeP) {
+                    setMapScale(scale);
+                    setMapTx(w/2 - homeP.pos_x * scale);
+                    setMapTy(h/2 - homeP.pos_y * scale);
+                    // Открываем систему и выделяем планету
+                    const sys = systems.find(s=>s.id===homeP!.star_system_id);
+                    if (sys) { setSelSystem(sys); setSelPlanet(homeP); }
+                  } else {
+                    resetMap();
+                  }
+                }} className="w-8 h-8 bg-black/60 hover:bg-white/20 rounded-lg text-white text-sm flex items-center justify-center transition" title="На домашнюю планету">🏠</button>
               </div>
 
               {/* Легенда */}

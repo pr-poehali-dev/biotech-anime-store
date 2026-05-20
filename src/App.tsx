@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { SiteSettingsProvider } from "@/contexts/SiteSettingsContext";
 import Header from "@/components/Header";
 import HomePage from "@/components/HomePage";
 import CatalogPage from "@/components/CatalogPage";
@@ -280,12 +281,14 @@ export default function App() {
   };
 
   return (
-    <TooltipProvider>
-      <Toaster />
-      <div className="min-h-screen bg-background">
-        <Header page={page} setPage={setPage} cartCount={cartCount} />
-        <main>{renderPage()}</main>
-      </div>
-    </TooltipProvider>
+    <SiteSettingsProvider>
+      <TooltipProvider>
+        <Toaster />
+        <div className="min-h-screen bg-background">
+          <Header page={page} setPage={setPage} cartCount={cartCount} />
+          <main>{renderPage()}</main>
+        </div>
+      </TooltipProvider>
+    </SiteSettingsProvider>
   );
 }

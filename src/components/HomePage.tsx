@@ -1,6 +1,7 @@
 import Icon from "@/components/ui/icon";
 import ProductCard from "@/components/ProductCard";
 import type { Page, Product } from "@/App";
+import { useSiteSettings } from "@/contexts/SiteSettingsContext";
 
 type Props = {
   setPage: (p: Page) => void;
@@ -23,6 +24,8 @@ const VET_BEAR_URL = "https://cdn.poehali.dev/projects/bdc6b0f1-9d51-4bfd-8a1e-7
 
 export default function HomePage({ setPage, products, addToCart }: Props) {
   const hits = products.filter((p) => !p.isVeteran).slice(0, 4);
+  const { settings } = useSiteSettings();
+  const t = settings.texts;
 
   return (
     <div className="animate-fade-in">
@@ -31,15 +34,15 @@ export default function HomePage({ setPage, products, addToCart }: Props) {
         <div className="container mx-auto flex flex-col md:flex-row items-center gap-10">
           <div className="flex-1 text-center md:text-left">
             <div className="inline-block bg-white/15 text-white text-xs font-semibold px-3 py-1 rounded-full mb-4 tracking-widest uppercase">
-              Официальный маркетплейс
+              {t.heroBadge}
             </div>
             <h1 className="text-4xl md:text-5xl font-black leading-tight mb-4">
-              МТМ Маркет<br />
-              <span className="block text-blue-100 text-xl md:text-2xl font-bold tracking-wide mb-2">«Максимум технологий „Мишка“»</span>
-              <span className="text-blue-200">Услуги профессионалов</span>
+              {t.heroTitle}<br />
+              <span className="block text-blue-100 text-xl md:text-2xl font-bold tracking-wide mb-2">{t.heroSubtitle}</span>
+              <span className="text-blue-200">{t.servicesPromoTitle}</span>
             </h1>
             <p className="text-blue-100 text-lg mb-8 max-w-md">
-              Передовые биотехнологические продукты для вашего здоровья. Лицензированная продукция, доставка по всей России.
+              {t.heroDescription}
             </p>
             <div className="flex flex-wrap gap-3 justify-center md:justify-start">
               <button
@@ -101,8 +104,8 @@ export default function HomePage({ setPage, products, addToCart }: Props) {
           <img src={VET_BEAR_URL} alt="Мишка ветеран" className="w-24 h-24 rounded-2xl object-cover border-2 border-white/30 shadow-xl" />
           <div className="flex-1 text-center sm:text-left">
             <div className="text-xs font-bold tracking-widest text-blue-300 uppercase mb-1">Специальный раздел</div>
-            <h3 className="text-2xl font-black mb-2">Товары для ветеранов СВО</h3>
-            <p className="text-blue-200 text-sm mb-4">Бесплатные и льготные биотехнологические продукты для восстановления здоровья участников специальной военной операции</p>
+            <h3 className="text-2xl font-black mb-2">{t.veteransBannerTitle}</h3>
+            <p className="text-blue-200 text-sm mb-4">{t.veteransBannerText}</p>
             <button
               onClick={() => setPage("veterans")}
               className="bear-btn bg-red-600 hover:bg-red-700 text-white font-bold px-5 py-2.5 rounded-xl inline-flex items-center gap-2"
@@ -137,9 +140,9 @@ export default function HomePage({ setPage, products, addToCart }: Props) {
             <div>
               <div className="text-xs font-bold tracking-widest text-primary uppercase mb-1">Профессиональный сервис</div>
               <h2 className="text-2xl font-black text-foreground" style={{ fontFamily: "Montserrat, sans-serif" }}>
-                Услуги профессионалов
+                {t.servicesPromoTitle}
               </h2>
-              <p className="text-muted-foreground text-sm mt-1">Ремонт ПК, установка ПО, техническое обслуживание</p>
+              <p className="text-muted-foreground text-sm mt-1">{t.servicesPromoText}</p>
             </div>
             <button
               onClick={() => setPage("services")}

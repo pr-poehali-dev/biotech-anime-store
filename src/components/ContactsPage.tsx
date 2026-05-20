@@ -1,9 +1,11 @@
 import { useState } from "react";
 import Icon from "@/components/ui/icon";
+import { useSiteSettings } from "@/contexts/SiteSettingsContext";
 
 const EMAIL_URL = "https://functions.poehali.dev/96724469-2c55-4fdb-8962-080fa1f53e80";
 
 export default function ContactsPage() {
+  const { settings } = useSiteSettings();
   const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -39,15 +41,10 @@ export default function ContactsPage() {
 
   return (
     <div className="container mx-auto px-4 py-10 max-w-3xl animate-fade-in">
-      <h1 className="text-3xl font-black mb-8" style={{ fontFamily: "Montserrat, sans-serif" }}>Контакты</h1>
+      <h1 className="text-3xl font-black mb-8" style={{ fontFamily: "Montserrat, sans-serif" }}>{settings.texts.contactsTitle}</h1>
 
       <div className="grid sm:grid-cols-2 gap-6 mb-8">
-        {[
-          { icon: "Phone", label: "Телефон", value: "+7 (800) 000-00-00", sub: "Бесплатный звонок по России" },
-          { icon: "Mail", label: "Email", value: "info@mtb-market.ru", sub: "Ответим в течение 24 часов" },
-          { icon: "MapPin", label: "Адрес", value: "Москва, ул. Биотехническая, 1", sub: "Пн–Пт: 9:00–18:00" },
-          { icon: "Clock", label: "Режим работы", value: "Пн–Пт 9:00–18:00", sub: "Сб–Вс: выходной" },
-        ].map((item) => (
+        {settings.contacts.map((item) => (
           <div key={item.label} className="bg-white rounded-2xl border border-border p-5 flex items-start gap-3">
             <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center flex-shrink-0">
               <Icon name={item.icon} fallback="Star" size={20} className="text-primary" />
@@ -62,7 +59,7 @@ export default function ContactsPage() {
       </div>
 
       <div className="bg-white rounded-2xl border border-border p-6">
-        <h2 className="text-xl font-black mb-5" style={{ fontFamily: "Montserrat, sans-serif" }}>Написать нам</h2>
+        <h2 className="text-xl font-black mb-5" style={{ fontFamily: "Montserrat, sans-serif" }}>{settings.texts.contactsFormTitle}</h2>
         {sent ? (
           <div className="text-center py-8">
             <div className="text-5xl mb-3">🐻</div>

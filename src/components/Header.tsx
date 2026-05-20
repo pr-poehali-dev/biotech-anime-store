@@ -1,6 +1,7 @@
 import { useState } from "react";
 import Icon from "@/components/ui/icon";
 import type { Page } from "@/App";
+import { useSiteSettings } from "@/contexts/SiteSettingsContext";
 
 type HeaderProps = {
   page: Page;
@@ -8,17 +9,10 @@ type HeaderProps = {
   cartCount: number;
 };
 
-const NAV = [
-  { id: "home",     label: "Главная" },
-  { id: "catalog",  label: "Каталог" },
-  { id: "services", label: "Услуги" },
-  { id: "veterans", label: "Ветеранам СВО" },
-  { id: "delivery", label: "Доставка и оплата" },
-  { id: "contacts", label: "Контакты" },
-] as const;
-
 export default function Header({ page, setPage, cartCount }: HeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const { settings } = useSiteSettings();
+  const NAV = settings.menu;
 
   return (
     <header className="sticky top-0 z-50 bg-white border-b border-border shadow-sm">
@@ -31,9 +25,9 @@ export default function Header({ page, setPage, cartCount }: HeaderProps) {
             </div>
             <div className="hidden sm:block">
               <div className="font-black text-sm leading-tight text-foreground" style={{ fontFamily: "Montserrat, sans-serif" }}>
-                Товары · Услуги · Ветеранам
+                {settings.siteName}
               </div>
-              <div className="text-xs text-muted-foreground leading-tight">МТМ Маркет «Максимум технологий „Мишка“»</div>
+              <div className="text-xs text-muted-foreground leading-tight">{settings.siteSubtitle}</div>
             </div>
           </button>
 
@@ -42,16 +36,16 @@ export default function Header({ page, setPage, cartCount }: HeaderProps) {
             {NAV.map((n) => (
               <button
                 key={n.id}
-                onClick={() => setPage(n.id as Page)}
+                onClick={() => setPage(n.page as Page)}
                 className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  page === n.id
+                  page === n.page
                     ? "bg-primary text-primary-foreground"
-                    : n.id === "veterans"
+                    : n.page === "veterans"
                     ? "text-red-700 hover:bg-red-50 font-semibold"
                     : "text-foreground hover:bg-secondary"
                 }`}
               >
-                {n.id === "veterans" && "🎖️ "}
+                {n.page === "veterans" && "🎖️ "}
                 {n.label}
               </button>
             ))}
@@ -95,16 +89,16 @@ export default function Header({ page, setPage, cartCount }: HeaderProps) {
             {NAV.map((n) => (
               <button
                 key={n.id}
-                onClick={() => { setPage(n.id as Page); setMenuOpen(false); }}
+                onClick={() => { setPage(n.page as Page); setMenuOpen(false); }}
                 className={`w-full text-left px-3 py-2.5 rounded-lg text-sm font-medium transition-colors mb-0.5 ${
-                  page === n.id
+                  page === n.page
                     ? "bg-primary text-primary-foreground"
-                    : n.id === "veterans"
+                    : n.page === "veterans"
                     ? "text-red-700 font-semibold"
                     : "hover:bg-secondary"
                 }`}
               >
-                {n.id === "veterans" && "🎖️ "}
+                {n.page === "veterans" && "🎖️ "}
                 {n.label}
               </button>
             ))}

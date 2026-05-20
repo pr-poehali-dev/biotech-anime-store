@@ -1,0 +1,10 @@
+{
+  "tests": [
+    {
+      "name": "Forbidden without password",
+      "method": "GET",
+      "path": "/",
+      "expectedStatus": 403
+    }
+  ]
+}

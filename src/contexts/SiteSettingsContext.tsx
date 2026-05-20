@@ -1,4 +1,5 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, ReactNode, useRef } from "react";
+import func2url from "../../backend/func2url.json";
 
 export type MenuItem = { id: string; label: string; page: string };
 
@@ -25,6 +26,7 @@ export type PageTexts = {
   servicesTitle: string;
   catalogTitle: string;
   footerText: string;
+  tasksTitle: string;
 };
 
 export type SiteSettings = {
@@ -44,6 +46,7 @@ const DEFAULT_SETTINGS: SiteSettings = {
     { id: "home", label: "Главная", page: "home" },
     { id: "catalog", label: "Каталог", page: "catalog" },
     { id: "services", label: "Услуги", page: "services" },
+    { id: "tasks", label: "Задачи", page: "tasks" },
     { id: "veterans", label: "Ветеранам СВО", page: "veterans" },
     { id: "delivery", label: "Доставка и оплата", page: "delivery" },
     { id: "contacts", label: "Контакты", page: "contacts" },
@@ -70,64 +73,94 @@ const DEFAULT_SETTINGS: SiteSettings = {
     servicesTitle: "Услуги профессионалов",
     catalogTitle: "Каталог товаров",
     footerText: "© МТМ Маркет «Максимум технологий „Мишка“». Все права защищены.",
+    tasksTitle: "Задачи для инженеров",
   },
 };
 
-const STORAGE_KEY = "site_settings_v1";
+const SETTINGS_URL = (func2url as Record<string, string>)["settings"];
 
 type Ctx = {
   settings: SiteSettings;
-  updateSettings: (patch: Partial<SiteSettings>) => void;
-  updateTexts: (patch: Partial<PageTexts>) => void;
-  setMenu: (menu: MenuItem[]) => void;
-  setContacts: (contacts: ContactItem[]) => void;
-  resetToDefault: () => void;
+  loading: boolean;
+  updateSettings: (patch: Partial<SiteSettings>, adminPassword: string) => Promise<void>;
+  updateTexts: (patch: Partial<PageTexts>, adminPassword: string) => Promise<void>;
+  setMenu: (menu: MenuItem[], adminPassword: string) => Promise<void>;
+  setContacts: (contacts: ContactItem[], adminPassword: string) => Promise<void>;
+  resetToDefault: (adminPassword: string) => Promise<void>;
 };
 
 const SiteSettingsContext = createContext<Ctx | null>(null);
 
+function mergeWithDefaults(parsed: Partial<SiteSettings>): SiteSettings {
+  return {
+    ...DEFAULT_SETTINGS,
+    ...parsed,
+    menu: parsed.menu && parsed.menu.length > 0 ? parsed.menu : DEFAULT_SETTINGS.menu,
+    contacts: parsed.contacts && parsed.contacts.length > 0 ? parsed.contacts : DEFAULT_SETTINGS.contacts,
+    texts: { ...DEFAULT_SETTINGS.texts, ...(parsed.texts || {}) },
+  };
+}
+
 export function SiteSettingsProvider({ children }: { children: ReactNode }) {
-  const [settings, setSettings] = useState<SiteSettings>(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        return {
-          ...DEFAULT_SETTINGS,
-          ...parsed,
-          texts: { ...DEFAULT_SETTINGS.texts, ...(parsed.texts || {}) },
-        };
-      }
-    } catch (e) {
-      console.warn("settings load failed", e);
-    }
-    return DEFAULT_SETTINGS;
-  });
+  const [settings, setSettings] = useState<SiteSettings>(DEFAULT_SETTINGS);
+  const [loading, setLoading] = useState(true);
+  const initialized = useRef(false);
 
   useEffect(() => {
+    if (initialized.current) return;
+    initialized.current = true;
+    (async () => {
+      try {
+        const res = await fetch(SETTINGS_URL);
+        if (res.ok) {
+          const data = await res.json();
+          if (data && typeof data === "object" && Object.keys(data).length > 0) {
+            setSettings(mergeWithDefaults(data));
+          }
+        }
+      } catch (e) {
+        console.warn("settings fetch failed", e);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  const save = async (next: SiteSettings, adminPassword: string) => {
+    setSettings(next);
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+      await fetch(SETTINGS_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Admin-Password": adminPassword },
+        body: JSON.stringify(next),
+      });
     } catch (e) {
       console.warn("settings save failed", e);
     }
-  }, [settings]);
+  };
 
-  const updateSettings = (patch: Partial<SiteSettings>) =>
-    setSettings((s) => ({ ...s, ...patch }));
+  const updateSettings = async (patch: Partial<SiteSettings>, adminPassword: string) => {
+    await save({ ...settings, ...patch }, adminPassword);
+  };
 
-  const updateTexts = (patch: Partial<PageTexts>) =>
-    setSettings((s) => ({ ...s, texts: { ...s.texts, ...patch } }));
+  const updateTexts = async (patch: Partial<PageTexts>, adminPassword: string) => {
+    await save({ ...settings, texts: { ...settings.texts, ...patch } }, adminPassword);
+  };
 
-  const setMenu = (menu: MenuItem[]) =>
-    setSettings((s) => ({ ...s, menu }));
+  const setMenu = async (menu: MenuItem[], adminPassword: string) => {
+    await save({ ...settings, menu }, adminPassword);
+  };
 
-  const setContacts = (contacts: ContactItem[]) =>
-    setSettings((s) => ({ ...s, contacts }));
+  const setContacts = async (contacts: ContactItem[], adminPassword: string) => {
+    await save({ ...settings, contacts }, adminPassword);
+  };
 
-  const resetToDefault = () => setSettings(DEFAULT_SETTINGS);
+  const resetToDefault = async (adminPassword: string) => {
+    await save(DEFAULT_SETTINGS, adminPassword);
+  };
 
   return (
-    <SiteSettingsContext.Provider value={{ settings, updateSettings, updateTexts, setMenu, setContacts, resetToDefault }}>
+    <SiteSettingsContext.Provider value={{ settings, loading, updateSettings, updateTexts, setMenu, setContacts, resetToDefault }}>
       {children}
     </SiteSettingsContext.Provider>
   );

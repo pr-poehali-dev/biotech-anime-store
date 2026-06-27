@@ -4,6 +4,7 @@
 """
 import json
 import os
+import uuid
 import hashlib
 import requests
 import psycopg2
@@ -148,6 +149,18 @@ def handler(event: dict, context) -> dict:
         finally:
             cur.close()
             conn.close()
+
+    if body.get("action") == "manual_paid":
+        cart = body.get("cart", [])
+        amount_rub = sum(item.get("price", 0) * item.get("qty", 1) for item in cart if not item.get("isVeteran"))
+        order_id = body.get("orderId") or f"sbp-qr-{uuid.uuid4().hex[:8]}"
+        payment_id = f"QR-{uuid.uuid4().hex[:10]}"
+        save_order(order_id, payment_id, amount_rub, "sbp_qr", [
+            {"name": i.get("name", ""), "price": i.get("price", 0), "qty": i.get("qty", 1), "isVeteran": i.get("isVeteran", False)}
+            for i in cart
+        ])
+        update_order_status(payment_id, "CONFIRMED")
+        return {"statusCode": 200, "headers": cors_headers, "body": json.dumps({"success": True, "paymentId": payment_id}, ensure_ascii=False)}
 
     if body.get("action") == "status":
         payment_id = body.get("paymentId")

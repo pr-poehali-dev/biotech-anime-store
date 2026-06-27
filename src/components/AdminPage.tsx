@@ -569,7 +569,7 @@ function OrdersTab() {
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-black">{o.amount.toLocaleString("ru")} ₽</span>
                     <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${st.cls}`}>{st.text}</span>
-                    <span className="text-xs text-muted-foreground">{o.method === "sbp" ? "СБП" : "Карта"}</span>
+                    <span className="text-xs text-muted-foreground">{o.method === "sbp" ? "СБП" : o.method === "sbp_qr" ? "СБП по QR" : "Карта"}</span>
                   </div>
                   <div className="text-xs text-muted-foreground mt-1">
                     Платёж №{o.paymentId} {dt && `· ${dt.toLocaleString("ru")}`}

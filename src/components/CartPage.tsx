@@ -399,7 +399,23 @@ export default function CartPage({ cart, removeFromCart, updateQty, setPage, cle
               </a>
             )}
             <button
-              onClick={() => markPaid(total)}
+              onClick={async () => {
+                const amount = total;
+                try {
+                  await fetch(PAYMENT_URL, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      action: "manual_paid",
+                      orderId: `order-${Date.now()}`,
+                      cart: buildCart(),
+                    }),
+                  });
+                } catch {
+                  // заказ всё равно подтверждаем покупателю
+                }
+                markPaid(amount);
+              }}
               className="bear-btn block w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 rounded-2xl mb-3"
             >
               Я оплатил

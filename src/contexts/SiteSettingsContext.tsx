@@ -36,6 +36,8 @@ export type SiteSettings = {
   menu: MenuItem[];
   contacts: ContactItem[];
   texts: PageTexts;
+  sbpLink: string;
+  sbpQrImage: string;
 };
 
 const DEFAULT_SETTINGS: SiteSettings = {
@@ -75,6 +77,8 @@ const DEFAULT_SETTINGS: SiteSettings = {
     footerText: "© МТМ Маркет «Максимум технологий „Мишка“». Все права защищены.",
     tasksTitle: "Задачи для инженеров",
   },
+  sbpLink: "",
+  sbpQrImage: "",
 };
 
 const SETTINGS_URL = (func2url as Record<string, string>)["settings"];

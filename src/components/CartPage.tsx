@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import Icon from "@/components/ui/icon";
 import type { CartItem, Page } from "@/App";
+import { useSiteSettings } from "@/contexts/SiteSettingsContext";
 
 const PAYMENT_URL = "https://functions.poehali.dev/c32d0a92-5be1-4706-a6f2-802136bbceb1";
 
@@ -21,6 +22,8 @@ export default function CartPage({ cart, removeFromCart, updateQty, setPage, cle
   const [paidAmount, setPaidAmount] = useState(0);
   const [failed, setFailed] = useState(false);
   const [sbpPaymentId, setSbpPaymentId] = useState("");
+  const [showManualSbp, setShowManualSbp] = useState(false);
+  const { settings } = useSiteSettings();
   const total = cart.reduce((s, i) => s + i.price * i.qty, 0);
   const hasVet = cart.some((i) => i.isVeteran);
   const paidHandled = useRef(false);
@@ -120,8 +123,12 @@ export default function CartPage({ cart, removeFromCart, updateQty, setPage, cle
   };
 
   const handleSbpPay = async () => {
-    setSbpLoading(true);
     setError("");
+    if (settings.sbpLink || settings.sbpQrImage) {
+      setShowManualSbp(true);
+      return;
+    }
+    setSbpLoading(true);
     try {
       const orderId = `order-${Date.now()}`;
       const res = await fetch(PAYMENT_URL, {
@@ -343,6 +350,51 @@ export default function CartPage({ cart, removeFromCart, updateQty, setPage, cle
           </div>
         </div>
       </div>
+
+      {showManualSbp && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 animate-fade-in"
+          onClick={() => setShowManualSbp(false)}
+        >
+          <div
+            className="bg-white rounded-3xl p-6 w-full max-w-sm text-center relative"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setShowManualSbp(false)}
+              className="absolute top-4 right-4 w-8 h-8 rounded-full hover:bg-secondary flex items-center justify-center"
+            >
+              <Icon name="X" size={18} />
+            </button>
+            <div className="text-3xl mb-2">📱</div>
+            <h3 className="font-black text-lg mb-1" style={{ fontFamily: "Montserrat, sans-serif" }}>
+              Оплата по СБП
+            </h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              Отсканируйте QR-код или перейдите по ссылке для оплаты
+            </p>
+            {settings.sbpQrImage && (
+              <div className="bg-white border border-border rounded-2xl p-3 inline-block mb-4">
+                <img src={settings.sbpQrImage} alt="QR-код для оплаты по СБП" className="w-[260px] h-[260px] object-contain" />
+              </div>
+            )}
+            <div className="font-black text-xl text-primary mb-3">{total.toLocaleString("ru")} ₽</div>
+            {settings.sbpLink && (
+              <a
+                href={settings.sbpLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="bear-btn block w-full bg-primary text-primary-foreground font-bold py-3 rounded-2xl mb-3"
+              >
+                Перейти к оплате СБП
+              </a>
+            )}
+            <p className="text-xs text-muted-foreground">
+              После оплаты сохраните чек. Заказ будет обработан вручную.
+            </p>
+          </div>
+        </div>
+      )}
 
       {qrPayload && (
         <div

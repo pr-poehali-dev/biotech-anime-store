@@ -286,7 +286,67 @@ function PaymentTab() {
         {saving ? "Сохранение…" : saved ? "Сохранено ✓" : "Сохранить настройки оплаты"}
       </button>
 
+      <SbpManualBlock />
+
       <RefundBlock />
+    </div>
+  );
+}
+
+function SbpManualBlock() {
+  const { settings, updateSettings } = useSiteSettings();
+  const [link, setLink] = useState(settings.sbpLink || "");
+  const [qr, setQr] = useState(settings.sbpQrImage || "");
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  const save = async () => {
+    setSaving(true);
+    setSaved(false);
+    await updateSettings({ sbpLink: link.trim(), sbpQrImage: qr.trim() }, ADMIN_PASSWORD);
+    setSaving(false);
+    setSaved(true);
+  };
+
+  return (
+    <div className="border-t border-border pt-5 mt-2 space-y-3">
+      <div className="flex items-center gap-2">
+        <Icon name="QrCode" size={18} className="text-primary" />
+        <h3 className="font-black text-base">Оплата по СБП (своя ссылка / QR)</h3>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Вставьте свою ссылку на оплату СБП и/или картинку QR-кода от Т-Банка. Они будут показаны покупателю в корзине при выборе оплаты по СБП.
+      </p>
+      <div>
+        <label className="text-xs font-semibold text-muted-foreground mb-1 block">Ссылка на оплату по СБП</label>
+        <input
+          className="w-full border border-border rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30"
+          value={link}
+          placeholder="https://www.tbank.ru/..."
+          onChange={(e) => setLink(e.target.value)}
+        />
+      </div>
+      <div>
+        <label className="text-xs font-semibold text-muted-foreground mb-1 block">Ссылка на картинку QR-кода</label>
+        <input
+          className="w-full border border-border rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30"
+          value={qr}
+          placeholder="https://...qr.png"
+          onChange={(e) => setQr(e.target.value)}
+        />
+        {qr && (
+          <div className="mt-2">
+            <img src={qr} alt="Превью QR" className="w-32 h-32 object-contain border border-border rounded-xl bg-white" />
+          </div>
+        )}
+      </div>
+      <button
+        onClick={save}
+        disabled={saving}
+        className="bear-btn w-full bg-primary text-primary-foreground font-bold py-2.5 rounded-xl disabled:opacity-60"
+      >
+        {saving ? "Сохранение…" : saved ? "Сохранено ✓" : "Сохранить ссылку и QR для СБП"}
+      </button>
     </div>
   );
 }

@@ -23,6 +23,7 @@ const EMPTY: Omit<Product, "id"> = {
   isVeteran: false,
   description: "",
   badge: "",
+  outOfStock: false,
 };
 
 const CATEGORIES = ["Биотехнологии", "Нутрицевтика", "Детокс", "Компьютеры", "Одежда и обувь", "Услуги", "Ветеранам"];
@@ -318,7 +319,7 @@ function ProductsTab({ products, setProducts }: Props) {
   const [showForm, setShowForm] = useState(false);
 
   const openNew = () => { setEditing(null); setForm(EMPTY); setShowForm(true); };
-  const openEdit = (p: Product) => { setEditing(p); setForm({ name: p.name, price: p.price, oldPrice: p.oldPrice, image: p.image, category: p.category, isVeteran: p.isVeteran, description: p.description, badge: p.badge }); setShowForm(true); };
+  const openEdit = (p: Product) => { setEditing(p); setForm({ name: p.name, price: p.price, oldPrice: p.oldPrice, image: p.image, category: p.category, isVeteran: p.isVeteran, description: p.description, badge: p.badge, outOfStock: p.outOfStock }); setShowForm(true); };
 
   const saveProduct = () => {
     if (!form.name.trim()) return alert("Введите название товара");
@@ -364,6 +365,13 @@ function ProductsTab({ products, setProducts }: Props) {
               <Field label="URL изображения" value={form.image} onChange={(v) => setForm({ ...form, image: v })} />
               <Field label="Описание" value={form.description} onChange={(v) => setForm({ ...form, description: v })} multiline />
               <Field label="Бейдж" value={form.badge ?? ""} onChange={(v) => setForm({ ...form, badge: v })} />
+              <label className={`flex items-center gap-3 border rounded-xl px-3 py-2.5 cursor-pointer ${form.outOfStock ? "border-amber-400 bg-amber-50" : "border-border"}`}>
+                <input type="checkbox" className="w-4 h-4 accent-amber-500" checked={!!form.outOfStock} onChange={(e) => setForm({ ...form, outOfStock: e.target.checked })} />
+                <div>
+                  <div className="text-sm font-semibold">Нет в наличии (заморозить покупку)</div>
+                  <div className="text-xs text-muted-foreground">Клиенты не смогут добавить товар в корзину</div>
+                </div>
+              </label>
             </div>
             <div className="flex gap-3 mt-5">
               <button onClick={saveProduct} className="bear-btn flex-1 bg-primary text-primary-foreground font-bold py-2.5 rounded-xl">{editing ? "Сохранить" : "Добавить"}</button>
@@ -391,7 +399,10 @@ function ProductsTab({ products, setProducts }: Props) {
                     <div className="flex items-center gap-3">
                       <img src={p.image} alt={p.name} className="w-10 h-10 rounded-lg object-cover bg-slate-100" />
                       <div>
-                        <div className="font-semibold">{p.name}</div>
+                        <div className="font-semibold flex items-center gap-2">
+                          {p.name}
+                          {p.outOfStock && <span className="text-[10px] font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">Нет в наличии</span>}
+                        </div>
                         <div className="text-xs text-muted-foreground line-clamp-1">{p.description}</div>
                       </div>
                     </div>
@@ -399,6 +410,13 @@ function ProductsTab({ products, setProducts }: Props) {
                   <td className="px-4 py-3">{p.category}</td>
                   <td className="px-4 py-3 font-bold">{p.price === 0 ? "Бесплатно" : `${p.price} ₽`}</td>
                   <td className="px-4 py-3 text-right">
+                    <button
+                      onClick={() => setProducts(products.map((x) => x.id === p.id ? { ...x, outOfStock: !x.outOfStock } : x))}
+                      className={`p-2 rounded-lg mr-1 ${p.outOfStock ? "text-amber-600 hover:bg-amber-50" : "text-green-600 hover:bg-green-50"}`}
+                      title={p.outOfStock ? "Вернуть в продажу" : "Заморозить покупку"}
+                    >
+                      <Icon name={p.outOfStock ? "Snowflake" : "Check"} fallback="Circle" size={16} />
+                    </button>
                     <button onClick={() => openEdit(p)} className="text-primary hover:bg-blue-50 p-2 rounded-lg mr-1"><Icon name="Pencil" size={16} /></button>
                     <button onClick={() => deleteProduct(p.id)} className="text-red-600 hover:bg-red-50 p-2 rounded-lg"><Icon name="Trash2" size={16} /></button>
                   </td>

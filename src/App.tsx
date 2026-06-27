@@ -25,6 +25,7 @@ export type Product = {
   isVeteran?: boolean;
   description: string;
   badge?: string;
+  outOfStock?: boolean;
 };
 
 export type CartItem = Product & { qty: number };

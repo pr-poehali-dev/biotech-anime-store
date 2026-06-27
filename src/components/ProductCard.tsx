@@ -11,17 +11,25 @@ const VET_BEAR_IMG = "https://cdn.poehali.dev/projects/bdc6b0f1-9d51-4bfd-8a1e-7
 
 export default function ProductCard({ product, onAdd }: Props) {
   const isVet = product.isVeteran;
+  const soldOut = !!product.outOfStock;
 
   return (
-    <div className={`bg-white rounded-2xl overflow-hidden card-hover border ${isVet ? "border-red-200" : "border-border"} flex flex-col`}>
+    <div className={`bg-white rounded-2xl overflow-hidden card-hover border ${isVet ? "border-red-200" : "border-border"} flex flex-col ${soldOut ? "opacity-90" : ""}`}>
       <div className="relative">
         <div className={`h-44 flex items-center justify-center overflow-hidden ${isVet ? "bg-gradient-to-br from-blue-950 to-red-900" : "bg-gradient-to-br from-blue-50 to-indigo-100"}`}>
           <img
             src={isVet ? VET_BEAR_IMG : BEAR_IMG}
             alt={product.name}
-            className="h-36 w-36 object-cover rounded-full border-4 border-white shadow-lg"
+            className={`h-36 w-36 object-cover rounded-full border-4 border-white shadow-lg ${soldOut ? "grayscale" : ""}`}
           />
         </div>
+        {soldOut && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+            <span className="bg-white text-slate-800 text-sm font-bold px-4 py-1.5 rounded-full shadow">
+              Нет в наличии
+            </span>
+          </div>
+        )}
         {product.badge && (
           <span className={`absolute top-2 left-2 text-xs font-bold px-2 py-1 rounded-lg ${
             isVet ? "badge-vet" :
@@ -55,13 +63,23 @@ export default function ProductCard({ product, onAdd }: Props) {
               </>
             )}
           </div>
-          <button
-            onClick={() => onAdd(product)}
-            className="bear-btn flex items-center gap-1.5 bg-primary text-primary-foreground px-3 py-2 rounded-xl text-sm font-semibold"
-          >
-            <Icon name="ShoppingCart" size={15} />
-            <span>{isVet ? "Получить" : "В корзину"}</span>
-          </button>
+          {soldOut ? (
+            <button
+              disabled
+              className="flex items-center gap-1.5 bg-slate-200 text-slate-500 px-3 py-2 rounded-xl text-sm font-semibold cursor-not-allowed"
+            >
+              <Icon name="Ban" size={15} />
+              <span>Недоступно</span>
+            </button>
+          ) : (
+            <button
+              onClick={() => onAdd(product)}
+              className="bear-btn flex items-center gap-1.5 bg-primary text-primary-foreground px-3 py-2 rounded-xl text-sm font-semibold"
+            >
+              <Icon name="ShoppingCart" size={15} />
+              <span>{isVet ? "Получить" : "В корзину"}</span>
+            </button>
+          )}
         </div>
       </div>
     </div>

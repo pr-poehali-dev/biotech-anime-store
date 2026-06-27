@@ -31,6 +31,7 @@ const CATEGORIES = ["Биотехнологии", "Нутрицевтика", "�
 type Tab = "site" | "texts" | "menu" | "contacts" | "products" | "payment" | "engineers" | "tasks";
 
 const PAYMENT_URL = (func2url as Record<string, string>)["payment-settings"];
+const TBANK_URL = (func2url as Record<string, string>)["tbank-payment"];
 
 export default function AdminPage({ products, setProducts }: Props) {
   const [password, setPassword] = useState("");
@@ -281,6 +282,88 @@ function PaymentTab() {
         className="bear-btn w-full bg-primary text-primary-foreground font-bold py-2.5 rounded-xl disabled:opacity-60"
       >
         {saving ? "Сохранение…" : saved ? "Сохранено ✓" : "Сохранить настройки оплаты"}
+      </button>
+
+      <RefundBlock />
+    </div>
+  );
+}
+
+function RefundBlock() {
+  const [paymentId, setPaymentId] = useState("");
+  const [amount, setAmount] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<{ ok: boolean; text: string } | null>(null);
+
+  const doRefund = async () => {
+    if (!paymentId.trim()) {
+      setResult({ ok: false, text: "Укажите номер платежа" });
+      return;
+    }
+    if (!confirm("Оформить возврат средств покупателю? Деньги вернутся на счёт, с которого была оплата.")) return;
+    setLoading(true);
+    setResult(null);
+    try {
+      const body: Record<string, unknown> = { action: "refund", paymentId: paymentId.trim() };
+      if (amount.trim()) body.amount = Number(amount.trim());
+      const res = await fetch(TBANK_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Admin-Password": ADMIN_PASSWORD },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setResult({ ok: true, text: data.message || "Возврат оформлен. Деньги вернутся на счёт покупателя." });
+        setPaymentId("");
+        setAmount("");
+      } else {
+        setResult({ ok: false, text: data.error || "Не удалось оформить возврат" });
+      }
+    } catch {
+      setResult({ ok: false, text: "Ошибка сети при оформлении возврата" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="border-t border-border pt-5 mt-2 space-y-3">
+      <div className="flex items-center gap-2">
+        <Icon name="Undo2" fallback="RotateCcw" size={18} className="text-primary" />
+        <h3 className="font-black text-base">Возврат средств покупателю</h3>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Если покупатель вернул товар и оформил возврат — введите номер платежа. Деньги автоматически вернутся на ту же карту/счёт, с которого была оплата.
+      </p>
+      <div>
+        <label className="text-xs font-semibold text-muted-foreground mb-1 block">Номер платежа (PaymentId)</label>
+        <input
+          className="w-full border border-border rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30"
+          value={paymentId}
+          placeholder="Например: 5391234567"
+          onChange={(e) => setPaymentId(e.target.value)}
+        />
+      </div>
+      <div>
+        <label className="text-xs font-semibold text-muted-foreground mb-1 block">Сумма возврата, ₽ (пусто = полный возврат)</label>
+        <input
+          className="w-full border border-border rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30"
+          value={amount}
+          placeholder="Оставьте пустым для полного возврата"
+          onChange={(e) => setAmount(e.target.value)}
+        />
+      </div>
+      {result && (
+        <div className={`rounded-xl px-3 py-2 text-xs ${result.ok ? "bg-green-50 border border-green-200 text-green-800" : "bg-red-50 border border-red-200 text-red-700"}`}>
+          {result.ok ? "✓ " : "⚠ "}{result.text}
+        </div>
+      )}
+      <button
+        onClick={doRefund}
+        disabled={loading}
+        className="bear-btn w-full bg-red-500 hover:bg-red-600 text-white font-bold py-2.5 rounded-xl disabled:opacity-60"
+      >
+        {loading ? "Оформляем возврат…" : "Оформить возврат средств"}
       </button>
     </div>
   );

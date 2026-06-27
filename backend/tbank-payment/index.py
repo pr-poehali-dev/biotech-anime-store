@@ -12,7 +12,9 @@ import psycopg2
 TBANK_API_URL = "https://securepay.tinkoff.ru/v2/Init"
 TBANK_QR_URL = "https://securepay.tinkoff.ru/v2/GetQr"
 TBANK_STATE_URL = "https://securepay.tinkoff.ru/v2/GetState"
+TBANK_CANCEL_URL = "https://securepay.tinkoff.ru/v2/Cancel"
 SCHEMA = 't_p83915249_biotech_anime_store'
+ADMIN_PASSWORD = '567765'
 
 
 def get_keys():
@@ -68,7 +70,7 @@ def handler(event: dict, context) -> dict:
     cors_headers = {
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type, X-User-Id, X-Auth-Token",
+        "Access-Control-Allow-Headers": "Content-Type, X-User-Id, X-Auth-Token, X-Admin-Password",
     }
 
     if event.get("httpMethod") == "OPTIONS":
@@ -98,6 +100,44 @@ def handler(event: dict, context) -> dict:
             "statusCode": 200,
             "headers": cors_headers,
             "body": json.dumps({"success": True, "status": status, "paid": paid}, ensure_ascii=False),
+        }
+
+    if body.get("action") == "refund":
+        headers = event.get("headers") or {}
+        pwd = headers.get("X-Admin-Password") or headers.get("x-admin-password") or ""
+        if pwd != ADMIN_PASSWORD:
+            return {"statusCode": 403, "headers": cors_headers, "body": json.dumps({"error": "Нет доступа. Только администратор может оформить возврат."}, ensure_ascii=False)}
+        payment_id = body.get("paymentId")
+        if not payment_id:
+            return {"statusCode": 400, "headers": cors_headers, "body": json.dumps({"error": "Не указан номер платежа (paymentId)"}, ensure_ascii=False)}
+        terminal_key, secret_key, _enabled = get_keys()
+        if not terminal_key or not secret_key:
+            return {"statusCode": 500, "headers": cors_headers, "body": json.dumps({"error": "Платёжные ключи не настроены"}, ensure_ascii=False)}
+        cancel_payload = {"TerminalKey": terminal_key, "PaymentId": str(payment_id)}
+        amount = body.get("amount")
+        if amount:
+            cancel_payload["Amount"] = int(round(float(amount) * 100))
+        cancel_payload["Token"] = generate_token(cancel_payload, secret_key)
+        try:
+            c_resp = requests.post(TBANK_CANCEL_URL, json=cancel_payload, timeout=20)
+            c_resp.raise_for_status()
+            c_data = c_resp.json()
+        except requests.RequestException as e:
+            return {"statusCode": 502, "headers": cors_headers, "body": json.dumps({"error": f"Ошибка возврата: {str(e)}"}, ensure_ascii=False)}
+        print("TBANK_CANCEL_RESPONSE:", json.dumps(c_data, ensure_ascii=False))
+        if not c_data.get("Success"):
+            err = c_data.get("Message", "Не удалось оформить возврат")
+            details = c_data.get("Details", "")
+            return {"statusCode": 400, "headers": cors_headers, "body": json.dumps({"error": f"{err} {details}".strip(), "code": c_data.get("ErrorCode")}, ensure_ascii=False)}
+        return {
+            "statusCode": 200,
+            "headers": cors_headers,
+            "body": json.dumps({
+                "success": True,
+                "status": c_data.get("Status"),
+                "refundedAmount": (c_data.get("OriginalAmount", 0) or 0) / 100,
+                "message": "Возврат оформлен. Деньги вернутся на счёт, с которого была оплата.",
+            }, ensure_ascii=False),
         }
 
     cart = body.get("cart", [])

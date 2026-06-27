@@ -32,6 +32,7 @@ type Tab = "site" | "texts" | "menu" | "contacts" | "products" | "payment" | "or
 
 const PAYMENT_URL = (func2url as Record<string, string>)["payment-settings"];
 const TBANK_URL = (func2url as Record<string, string>)["tbank-payment"];
+const UPLOAD_URL = (func2url as Record<string, string>)["settings"] + "?type=upload";
 
 export default function AdminPage({ products, setProducts }: Props) {
   const [password, setPassword] = useState("");
@@ -299,6 +300,7 @@ function SbpManualBlock() {
   const [qr, setQr] = useState(settings.sbpQrImage || "");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
   const save = async () => {
     setSaving(true);
@@ -306,6 +308,40 @@ function SbpManualBlock() {
     await updateSettings({ sbpLink: link.trim(), sbpQrImage: qr.trim() }, ADMIN_PASSWORD);
     setSaving(false);
     setSaved(true);
+  };
+
+  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      alert("Файл слишком большой (макс. 5 МБ)");
+      return;
+    }
+    setUploading(true);
+    try {
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      const res = await fetch(UPLOAD_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Admin-Password": ADMIN_PASSWORD },
+        body: JSON.stringify({ file: base64, contentType: file.type }),
+      });
+      const data = await res.json();
+      if (data.url) {
+        setQr(data.url);
+      } else {
+        alert(data.error || "Не удалось загрузить файл");
+      }
+    } catch {
+      alert("Ошибка при загрузке файла");
+    } finally {
+      setUploading(false);
+      e.target.value = "";
+    }
   };
 
   return (
@@ -327,11 +363,16 @@ function SbpManualBlock() {
         />
       </div>
       <div>
-        <label className="text-xs font-semibold text-muted-foreground mb-1 block">Ссылка на картинку QR-кода</label>
+        <label className="text-xs font-semibold text-muted-foreground mb-1 block">Картинка QR-кода</label>
+        <label className={`flex items-center justify-center gap-2 border border-dashed border-border rounded-xl px-3 py-3 text-sm font-semibold cursor-pointer hover:bg-secondary transition-colors mb-2 ${uploading ? "opacity-60 pointer-events-none" : ""}`}>
+          <Icon name={uploading ? "Loader2" : "Upload"} size={16} className={uploading ? "animate-spin" : ""} />
+          {uploading ? "Загружаем…" : "Загрузить картинку с устройства"}
+          <input type="file" accept="image/*" className="hidden" onChange={handleFile} />
+        </label>
         <input
           className="w-full border border-border rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30"
           value={qr}
-          placeholder="https://...qr.png"
+          placeholder="или вставьте ссылку https://...qr.png"
           onChange={(e) => setQr(e.target.value)}
         />
         {qr && (

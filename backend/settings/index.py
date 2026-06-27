@@ -1,13 +1,16 @@
 import json
 import os
+import base64
+import uuid
 import psycopg2
+import boto3
 
 ADMIN_PASSWORD = '567765'
 SCHEMA = 't_p83915249_biotech_anime_store'
 
 
 def handler(event, context):
-    '''Настройки сайта и товары: GET — получить, POST — сохранить (только админ). ?type=products — работа с товарами.'''
+    '''Настройки сайта, товары и загрузка файлов: ?type=products — товары, ?type=upload — загрузка картинки.'''
     method = event.get('httpMethod', 'GET')
     cors = {
         'Access-Control-Allow-Origin': '*',
@@ -19,6 +22,38 @@ def handler(event, context):
 
     params = event.get('queryStringParameters') or {}
     is_products = (params.get('type') == 'products')
+
+    if params.get('type') == 'upload' and method == 'POST':
+        headers = event.get('headers') or {}
+        pwd = headers.get('X-Admin-Password') or headers.get('x-admin-password') or ''
+        if pwd != ADMIN_PASSWORD:
+            return {'statusCode': 403, 'headers': {**cors, 'Content-Type': 'application/json'}, 'body': json.dumps({'error': 'forbidden'})}
+        body = json.loads(event.get('body') or '{}')
+        file_b64 = body.get('file', '')
+        content_type = body.get('contentType', 'image/png')
+        if ',' in file_b64:
+            file_b64 = file_b64.split(',', 1)[1]
+        try:
+            file_bytes = base64.b64decode(file_b64)
+        except Exception:
+            return {'statusCode': 400, 'headers': {**cors, 'Content-Type': 'application/json'}, 'body': json.dumps({'error': 'Неверный файл'})}
+        ext = 'png'
+        if 'jpeg' in content_type or 'jpg' in content_type:
+            ext = 'jpg'
+        elif 'webp' in content_type:
+            ext = 'webp'
+        elif 'svg' in content_type:
+            ext = 'svg'
+        key = f"uploads/{uuid.uuid4().hex}.{ext}"
+        s3 = boto3.client(
+            's3',
+            endpoint_url='https://bucket.poehali.dev',
+            aws_access_key_id=os.environ['AWS_ACCESS_KEY_ID'],
+            aws_secret_access_key=os.environ['AWS_SECRET_ACCESS_KEY'],
+        )
+        s3.put_object(Bucket='files', Key=key, Body=file_bytes, ContentType=content_type)
+        url = f"https://cdn.poehali.dev/projects/{os.environ['AWS_ACCESS_KEY_ID']}/bucket/{key}"
+        return {'statusCode': 200, 'headers': {**cors, 'Content-Type': 'application/json'}, 'body': json.dumps({'success': True, 'url': url})}
 
     conn = psycopg2.connect(os.environ['DATABASE_URL'])
     cur = conn.cursor()

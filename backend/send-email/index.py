@@ -39,6 +39,9 @@ def handler(event: dict, context) -> dict:
     plan = body.get("plan", "")
     comment = body.get("comment", "")
     cart = body.get("cart", [])
+    address = body.get("address", "")
+    docUrl = body.get("docUrl", "")
+    vetStatus = body.get("vetStatus", "")
 
     smtp_password = os.environ.get("YANDEX_SMTP_PASSWORD", "")
     if not smtp_password:
@@ -86,6 +89,38 @@ def handler(event: dict, context) -> dict:
         <td style="padding:8px;font-weight:bold;text-align:right;color:#1d4ed8">{total} ₽</td>
       </tr></tfoot>
     </table>
+  </div>
+</div>"""
+    elif form_type == "veteran":
+        subject = "🎖️ Заявка ветерана СВО на бесплатные товары"
+        items_html = "".join(
+            f"<tr><td style='padding:4px 8px;border-bottom:1px solid #eee'>{i.get('name','')}</td>"
+            f"<td style='padding:4px 8px;border-bottom:1px solid #eee;text-align:center'>{i.get('qty',1)} шт.</td></tr>"
+            for i in cart
+        ) or "<tr><td style='padding:4px 8px'>—</td><td></td></tr>"
+        doc_html = (
+            f"<a href='{docUrl}' style='display:inline-block;background:#1d4ed8;color:white;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:bold'>📎 Открыть документ</a>"
+            if docUrl else "<span style='color:#dc2626'>Документ не приложен</span>"
+        )
+        html_body = f"""
+<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto">
+  <div style="background:linear-gradient(135deg,#7f1d1d,#b91c1c);padding:24px;border-radius:12px 12px 0 0">
+    <h2 style="color:white;margin:0;font-size:20px">🎖️ Заявка ветерана СВО</h2>
+    <p style="color:#fecaca;margin:4px 0 0;font-size:13px">Бесплатные товары · {now}</p>
+  </div>
+  <div style="background:#f8fafc;padding:24px;border-radius:0 0 12px 12px;border:1px solid #e2e8f0">
+    <table style="width:100%;border-collapse:collapse;margin-bottom:16px">
+      <tr><td style="color:#64748b;padding:4px 0;width:140px">ФИО:</td><td style="font-weight:bold">{name}</td></tr>
+      <tr><td style="color:#64748b;padding:4px 0">Телефон:</td><td style="font-weight:bold">{phone}</td></tr>
+      <tr><td style="color:#64748b;padding:4px 0">Email:</td><td>{email}</td></tr>
+      <tr><td style="color:#64748b;padding:4px 0;vertical-align:top">Адрес доставки:</td><td style="font-weight:bold">{address or '—'}</td></tr>
+      <tr><td style="color:#64748b;padding:4px 0;vertical-align:top">Статус:</td><td>{vetStatus or '—'}</td></tr>
+      <tr><td style="color:#64748b;padding:4px 0;vertical-align:top">Комментарий:</td><td>{comment or '—'}</td></tr>
+    </table>
+    <h3 style="margin:0 0 8px;color:#1e293b;font-size:15px">Документ, подтверждающий статус</h3>
+    <p style="margin:0 0 16px">{doc_html}</p>
+    <h3 style="margin:0 0 8px;color:#1e293b;font-size:15px">Запрошенные товары</h3>
+    <table style="width:100%;border-collapse:collapse;font-size:14px">{items_html}</table>
   </div>
 </div>"""
     else:

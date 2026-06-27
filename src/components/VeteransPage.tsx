@@ -1,6 +1,11 @@
+import { useState } from "react";
 import ProductCard from "@/components/ProductCard";
 import Icon from "@/components/ui/icon";
 import type { Product } from "@/App";
+import func2url from "../../backend/func2url.json";
+
+const SEND_EMAIL_URL = (func2url as Record<string, string>)["send-email"];
+const VETDOC_URL = (func2url as Record<string, string>)["settings"] + "?type=vetdoc";
 
 type Props = {
   products: Product[];
@@ -9,6 +14,89 @@ type Props = {
 
 export default function VeteransPage({ products, addToCart }: Props) {
   const vetProducts = products.filter((p) => p.isVeteran);
+
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
+  const [address, setAddress] = useState("");
+  const [vetStatus, setVetStatus] = useState("");
+  const [comment, setComment] = useState("");
+  const [docUrl, setDocUrl] = useState("");
+  const [docName, setDocName] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleDoc = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) {
+      setError("Файл слишком большой (макс. 10 МБ)");
+      return;
+    }
+    setError("");
+    setUploading(true);
+    try {
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      const res = await fetch(VETDOC_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ file: base64, contentType: file.type }),
+      });
+      const data = await res.json();
+      if (data.url) {
+        setDocUrl(data.url);
+        setDocName(file.name);
+      } else {
+        setError(data.error || "Не удалось загрузить документ");
+      }
+    } catch {
+      setError("Ошибка при загрузке документа");
+    } finally {
+      setUploading(false);
+      e.target.value = "";
+    }
+  };
+
+  const submit = async () => {
+    if (!name.trim() || !phone.trim()) {
+      setError("Укажите ФИО и телефон");
+      return;
+    }
+    if (!docUrl) {
+      setError("Приложите документ, подтверждающий статус");
+      return;
+    }
+    setError("");
+    setSending(true);
+    try {
+      const res = await fetch(SEND_EMAIL_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          formType: "veteran",
+          name, phone, email, address, vetStatus, comment, docUrl,
+          cart: vetProducts.map((p) => ({ name: p.name, qty: 1 })),
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setSent(true);
+      } else {
+        setError(data.error || "Не удалось отправить заявку");
+      }
+    } catch {
+      setError("Ошибка отправки заявки");
+    } finally {
+      setSending(false);
+    }
+  };
 
   return (
     <div className="animate-fade-in">
@@ -76,6 +164,89 @@ export default function VeteransPage({ products, addToCart }: Props) {
           </div>
         </div>
       </section>
+
+      <section className="py-10 px-4 bg-white border-t border-border">
+        <div className="container mx-auto max-w-2xl">
+          <h2 className="text-xl font-black mb-2 text-center" style={{ fontFamily: "Montserrat, sans-serif" }}>
+            Заявка на бесплатное получение
+          </h2>
+          <p className="text-sm text-muted-foreground text-center mb-6">
+            Заполните форму и приложите документ — мы свяжемся с вами для бесплатной доставки
+          </p>
+
+          {sent ? (
+            <div className="bg-green-50 border border-green-200 rounded-2xl p-8 text-center">
+              <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
+                <Icon name="CheckCircle2" fallback="Check" size={40} className="text-green-600" />
+              </div>
+              <h3 className="font-black text-lg mb-1">Заявка отправлена!</h3>
+              <p className="text-sm text-muted-foreground">
+                Спасибо. Мы проверим документ и свяжемся с вами по указанному телефону.
+              </p>
+            </div>
+          ) : (
+            <div className="bg-slate-50 border border-border rounded-2xl p-6 space-y-4">
+              <div className="grid sm:grid-cols-2 gap-4">
+                <Field label="ФИО *" value={name} onChange={setName} placeholder="Иванов Иван Иванович" />
+                <Field label="Телефон *" value={phone} onChange={setPhone} placeholder="+7 (___) ___-__-__" />
+              </div>
+              <div className="grid sm:grid-cols-2 gap-4">
+                <Field label="Email" value={email} onChange={setEmail} placeholder="email@example.com" />
+                <Field label="Статус (ветеран / семья)" value={vetStatus} onChange={setVetStatus} placeholder="Участник СВО" />
+              </div>
+              <Field label="Адрес доставки" value={address} onChange={setAddress} placeholder="Город, улица, дом, квартира" />
+              <div>
+                <label className="text-xs font-semibold text-muted-foreground mb-1 block">Комментарий</label>
+                <textarea
+                  rows={2}
+                  value={comment}
+                  onChange={(e) => setComment(e.target.value)}
+                  placeholder="Какие товары интересуют, дополнительная информация"
+                  className="w-full border border-border rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30 resize-none"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-muted-foreground mb-1 block">
+                  Документ, подтверждающий статус * (фото, скан или PDF)
+                </label>
+                <label className={`flex items-center justify-center gap-2 border-2 border-dashed rounded-xl px-3 py-4 text-sm font-semibold cursor-pointer transition-colors ${docUrl ? "border-green-300 bg-green-50 text-green-700" : "border-border hover:bg-white"} ${uploading ? "opacity-60 pointer-events-none" : ""}`}>
+                  <Icon name={uploading ? "Loader2" : docUrl ? "CheckCircle2" : "Upload"} fallback="Upload" size={18} className={uploading ? "animate-spin" : ""} />
+                  {uploading ? "Загружаем…" : docUrl ? `Загружено: ${docName}` : "Загрузить документ"}
+                  <input type="file" accept="image/*,application/pdf" className="hidden" onChange={handleDoc} />
+                </label>
+                <p className="text-[11px] text-muted-foreground mt-1">Военный билет, удостоверение или справка. До 10 МБ.</p>
+              </div>
+
+              {error && (
+                <div className="bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl px-3 py-2">{error}</div>
+              )}
+
+              <button
+                onClick={submit}
+                disabled={sending}
+                className="bear-btn w-full bg-red-600 hover:bg-red-700 text-white font-black py-3 rounded-2xl disabled:opacity-60"
+              >
+                {sending ? "Отправляем…" : "Отправить заявку"}
+              </button>
+            </div>
+          )}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function Field({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string }) {
+  return (
+    <div>
+      <label className="text-xs font-semibold text-muted-foreground mb-1 block">{label}</label>
+      <input
+        value={value}
+        placeholder={placeholder}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full border border-border rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30"
+      />
     </div>
   );
 }

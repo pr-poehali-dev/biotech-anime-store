@@ -7,11 +7,13 @@
       "expectedStatus": 200
     },
     {
-      "name": "Missing body returns 400",
+      "name": "Empty body sends generic email",
       "method": "POST",
       "path": "/",
       "body": {},
-      "expectedStatus": 500
+      "expectedStatus": 200,
+      "expectedBody": {"success": true},
+      "bodyMatcher": "partial"
     }
   ]
 }

@@ -23,11 +23,13 @@ def handler(event, context):
     params = event.get('queryStringParameters') or {}
     is_products = (params.get('type') == 'products')
 
-    if params.get('type') == 'upload' and method == 'POST':
-        headers = event.get('headers') or {}
-        pwd = headers.get('X-Admin-Password') or headers.get('x-admin-password') or ''
-        if pwd != ADMIN_PASSWORD:
-            return {'statusCode': 403, 'headers': {**cors, 'Content-Type': 'application/json'}, 'body': json.dumps({'error': 'forbidden'})}
+    upload_type = params.get('type')
+    if upload_type in ('upload', 'vetdoc') and method == 'POST':
+        if upload_type == 'upload':
+            headers = event.get('headers') or {}
+            pwd = headers.get('X-Admin-Password') or headers.get('x-admin-password') or ''
+            if pwd != ADMIN_PASSWORD:
+                return {'statusCode': 403, 'headers': {**cors, 'Content-Type': 'application/json'}, 'body': json.dumps({'error': 'forbidden'})}
         body = json.loads(event.get('body') or '{}')
         file_b64 = body.get('file', '')
         content_type = body.get('contentType', 'image/png')
@@ -37,6 +39,8 @@ def handler(event, context):
             file_bytes = base64.b64decode(file_b64)
         except Exception:
             return {'statusCode': 400, 'headers': {**cors, 'Content-Type': 'application/json'}, 'body': json.dumps({'error': 'Неверный файл'})}
+        if len(file_bytes) > 10 * 1024 * 1024:
+            return {'statusCode': 400, 'headers': {**cors, 'Content-Type': 'application/json'}, 'body': json.dumps({'error': 'Файл слишком большой (макс. 10 МБ)'})}
         ext = 'png'
         if 'jpeg' in content_type or 'jpg' in content_type:
             ext = 'jpg'
@@ -44,7 +48,10 @@ def handler(event, context):
             ext = 'webp'
         elif 'svg' in content_type:
             ext = 'svg'
-        key = f"uploads/{uuid.uuid4().hex}.{ext}"
+        elif 'pdf' in content_type:
+            ext = 'pdf'
+        folder = 'vetdocs' if upload_type == 'vetdoc' else 'uploads'
+        key = f"{folder}/{uuid.uuid4().hex}.{ext}"
         s3 = boto3.client(
             's3',
             endpoint_url='https://bucket.poehali.dev',

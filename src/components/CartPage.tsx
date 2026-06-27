@@ -162,6 +162,15 @@ export default function CartPage({ cart, removeFromCart, updateQty, setPage, cle
     ? `https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(qrPayload)}`
     : "";
 
+  const isImageUrl = (u: string) =>
+    /\.(png|jpe?g|webp|svg|gif)(\?.*)?$/i.test(u) || u.includes("cdn.poehali.dev");
+
+  const manualQrSrc = settings.sbpQrImage && isImageUrl(settings.sbpQrImage)
+    ? settings.sbpQrImage
+    : settings.sbpLink || (settings.sbpQrImage && !isImageUrl(settings.sbpQrImage) ? settings.sbpQrImage : "")
+      ? `https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(settings.sbpLink || settings.sbpQrImage)}`
+      : "";
+
   if (paid) {
     return (
       <div className="container mx-auto px-4 py-20 text-center animate-fade-in">
@@ -373,9 +382,9 @@ export default function CartPage({ cart, removeFromCart, updateQty, setPage, cle
             <p className="text-sm text-muted-foreground mb-4">
               Отсканируйте QR-код или перейдите по ссылке для оплаты
             </p>
-            {settings.sbpQrImage && (
+            {manualQrSrc && (
               <div className="bg-white border border-border rounded-2xl p-3 inline-block mb-4">
-                <img src={settings.sbpQrImage} alt="QR-код для оплаты по СБП" className="w-[260px] h-[260px] object-contain" />
+                <img src={manualQrSrc} alt="QR-код для оплаты по СБП" className="w-[260px] h-[260px] object-contain" />
               </div>
             )}
             <div className="font-black text-xl text-primary mb-3">{total.toLocaleString("ru")} ₽</div>

@@ -314,6 +314,8 @@ export default function App() {
     setCart((prev) => prev.map((i) => i.id === id ? { ...i, qty } : i));
   };
 
+  const clearCart = () => setCart([]);
+
   const cartCount = cart.reduce((s, i) => s + i.qty, 0);
 
   const renderPage = () => {
@@ -321,7 +323,7 @@ export default function App() {
       case "home": return <HomePage setPage={setPage} products={products} addToCart={addToCart} />;
       case "catalog": return <CatalogPage products={products} addToCart={addToCart} />;
       case "veterans": return <VeteransPage products={products} addToCart={addToCart} />;
-      case "cart": return <CartPage cart={cart} removeFromCart={removeFromCart} updateQty={updateQty} setPage={setPage} />;
+      case "cart": return <CartPage cart={cart} removeFromCart={removeFromCart} updateQty={updateQty} setPage={setPage} clearCart={clearCart} />;
       case "admin": return <AdminPage products={products} setProducts={saveProducts} />;
       case "delivery": return <DeliveryPage />;
       case "contacts": return <ContactsPage />;

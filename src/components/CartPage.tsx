@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import Icon from "@/components/ui/icon";
 import type { CartItem, Page } from "@/App";
 
@@ -9,15 +9,59 @@ type Props = {
   removeFromCart: (id: number) => void;
   updateQty: (id: number, qty: number) => void;
   setPage: (p: Page) => void;
+  clearCart: () => void;
 };
 
-export default function CartPage({ cart, removeFromCart, updateQty, setPage }: Props) {
+export default function CartPage({ cart, removeFromCart, updateQty, setPage, clearCart }: Props) {
   const [loading, setLoading] = useState(false);
   const [sbpLoading, setSbpLoading] = useState(false);
   const [error, setError] = useState("");
   const [qrPayload, setQrPayload] = useState("");
+  const [paid, setPaid] = useState(false);
+  const [paidAmount, setPaidAmount] = useState(0);
+  const [sbpPaymentId, setSbpPaymentId] = useState("");
   const total = cart.reduce((s, i) => s + i.price * i.qty, 0);
   const hasVet = cart.some((i) => i.isVeteran);
+  const paidHandled = useRef(false);
+
+  const markPaid = (amount: number) => {
+    setPaidAmount(amount);
+    setPaid(true);
+    setQrPayload("");
+    clearCart();
+  };
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("payment") === "success" && !paidHandled.current) {
+      paidHandled.current = true;
+      markPaid(0);
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (!sbpPaymentId || paid) return;
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(PAYMENT_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "status", paymentId: sbpPaymentId }),
+        });
+        const data = await res.json();
+        if (data.paid) {
+          clearInterval(interval);
+          markPaid(total);
+        }
+      } catch {
+        // повторим на следующей итерации
+      }
+    }, 3000);
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sbpPaymentId, paid]);
 
   const buildCart = () =>
     cart.map((i) => ({
@@ -81,6 +125,7 @@ export default function CartPage({ cart, removeFromCart, updateQty, setPage }: P
       }
       if (data.qrPayload) {
         setQrPayload(data.qrPayload);
+        if (data.paymentId) setSbpPaymentId(String(data.paymentId));
       } else {
         setError(data.error || "Ошибка при создании QR-кода СБП");
       }
@@ -94,6 +139,27 @@ export default function CartPage({ cart, removeFromCart, updateQty, setPage }: P
   const qrImageUrl = qrPayload
     ? `https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(qrPayload)}`
     : "";
+
+  if (paid) {
+    return (
+      <div className="container mx-auto px-4 py-20 text-center animate-fade-in">
+        <div className="w-24 h-24 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-6">
+          <Icon name="CheckCircle2" fallback="Check" size={56} className="text-green-600" />
+        </div>
+        <h2 className="text-3xl font-black mb-2" style={{ fontFamily: "Montserrat, sans-serif" }}>Оплачено</h2>
+        <p className="text-muted-foreground mb-2">Спасибо за заказ! Платёж успешно принят.</p>
+        {paidAmount > 0 && (
+          <p className="font-black text-xl text-primary mb-6">{paidAmount.toLocaleString("ru")} ₽</p>
+        )}
+        <button
+          onClick={() => { setPaid(false); setPage("catalog"); }}
+          className="bear-btn bg-primary text-primary-foreground font-bold px-8 py-3 rounded-2xl"
+        >
+          Вернуться в магазин
+        </button>
+      </div>
+    );
+  }
 
   if (cart.length === 0) {
     return (
@@ -271,9 +337,10 @@ export default function CartPage({ cart, removeFromCart, updateQty, setPage }: P
             >
               Открыть в приложении банка
             </a>
-            <p className="text-xs text-muted-foreground">
-              После оплаты заказ будет принят автоматически
-            </p>
+            <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+              <Icon name="Loader2" size={14} className="animate-spin" />
+              Ожидаем подтверждение оплаты...
+            </div>
           </div>
         </div>
       )}

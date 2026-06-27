@@ -11,6 +11,7 @@ import psycopg2
 
 TBANK_API_URL = "https://securepay.tinkoff.ru/v2/Init"
 TBANK_QR_URL = "https://securepay.tinkoff.ru/v2/GetQr"
+TBANK_STATE_URL = "https://securepay.tinkoff.ru/v2/GetState"
 SCHEMA = 't_p83915249_biotech_anime_store'
 
 
@@ -77,6 +78,27 @@ def handler(event: dict, context) -> dict:
         body = json.loads(event.get("body") or "{}")
     except Exception:
         return {"statusCode": 400, "headers": cors_headers, "body": json.dumps({"error": "Invalid JSON"})}
+
+    if body.get("action") == "status":
+        payment_id = body.get("paymentId")
+        if not payment_id:
+            return {"statusCode": 400, "headers": cors_headers, "body": json.dumps({"error": "Не указан paymentId"})}
+        terminal_key, secret_key, _enabled = get_keys()
+        state_payload = {"TerminalKey": terminal_key, "PaymentId": str(payment_id)}
+        state_payload["Token"] = generate_token(state_payload, secret_key)
+        try:
+            st_resp = requests.post(TBANK_STATE_URL, json=state_payload, timeout=15)
+            st_resp.raise_for_status()
+            st_data = st_resp.json()
+        except requests.RequestException as e:
+            return {"statusCode": 502, "headers": cors_headers, "body": json.dumps({"error": f"Ошибка проверки статуса: {str(e)}"})}
+        status = st_data.get("Status", "")
+        paid = status in ("CONFIRMED", "AUTHORIZED")
+        return {
+            "statusCode": 200,
+            "headers": cors_headers,
+            "body": json.dumps({"success": True, "status": status, "paid": paid}, ensure_ascii=False),
+        }
 
     cart = body.get("cart", [])
     order_id = body.get("orderId", "order-1")

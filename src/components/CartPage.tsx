@@ -19,6 +19,7 @@ export default function CartPage({ cart, removeFromCart, updateQty, setPage, cle
   const [qrPayload, setQrPayload] = useState("");
   const [paid, setPaid] = useState(false);
   const [paidAmount, setPaidAmount] = useState(0);
+  const [failed, setFailed] = useState(false);
   const [sbpPaymentId, setSbpPaymentId] = useState("");
   const total = cart.reduce((s, i) => s + i.price * i.qty, 0);
   const hasVet = cart.some((i) => i.isVeteran);
@@ -31,11 +32,22 @@ export default function CartPage({ cart, removeFromCart, updateQty, setPage, cle
     clearCart();
   };
 
+  const markFailed = () => {
+    setFailed(true);
+    setQrPayload("");
+    setSbpPaymentId("");
+  };
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get("payment") === "success" && !paidHandled.current) {
+    if (paidHandled.current) return;
+    if (params.get("payment") === "success") {
       paidHandled.current = true;
       markPaid(0);
+      window.history.replaceState({}, "", window.location.pathname);
+    } else if (params.get("payment") === "fail") {
+      paidHandled.current = true;
+      markFailed();
       window.history.replaceState({}, "", window.location.pathname);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -54,6 +66,9 @@ export default function CartPage({ cart, removeFromCart, updateQty, setPage, cle
         if (data.paid) {
           clearInterval(interval);
           markPaid(total);
+        } else if (["REJECTED", "CANCELED", "DEADLINE_EXPIRED", "AUTH_FAIL"].includes(data.status)) {
+          clearInterval(interval);
+          markFailed();
         }
       } catch {
         // повторим на следующей итерации
@@ -157,6 +172,34 @@ export default function CartPage({ cart, removeFromCart, updateQty, setPage, cle
         >
           Вернуться в магазин
         </button>
+      </div>
+    );
+  }
+
+  if (failed) {
+    return (
+      <div className="container mx-auto px-4 py-20 text-center animate-fade-in">
+        <div className="w-24 h-24 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-6">
+          <Icon name="XCircle" fallback="X" size={56} className="text-red-600" />
+        </div>
+        <h2 className="text-3xl font-black mb-2" style={{ fontFamily: "Montserrat, sans-serif" }}>Не получилось оплатить</h2>
+        <p className="text-muted-foreground mb-6">Платёж не прошёл. Попробуйте ещё раз или выберите другой способ оплаты.</p>
+        <div className="flex flex-col sm:flex-row gap-3 justify-center">
+          {cart.length > 0 && (
+            <button
+              onClick={() => setFailed(false)}
+              className="bear-btn bg-primary text-primary-foreground font-bold px-8 py-3 rounded-2xl"
+            >
+              Попробовать снова
+            </button>
+          )}
+          <button
+            onClick={() => { setFailed(false); setPage("catalog"); }}
+            className="border border-border font-semibold px-8 py-3 rounded-2xl hover:bg-secondary transition-colors"
+          >
+            Вернуться в магазин
+          </button>
+        </div>
       </div>
     );
   }

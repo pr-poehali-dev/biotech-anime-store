@@ -274,6 +274,13 @@ export default function App() {
   }, [cart]);
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("payment") === "success" || params.get("payment") === "fail") {
+      setPage("cart");
+    }
+  }, []);
+
+  useEffect(() => {
     if (productsLoaded.current) return;
     productsLoaded.current = true;
     (async () => {

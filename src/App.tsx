@@ -250,9 +250,28 @@ const INITIAL_PRODUCTS: Product[] = [
 
 export default function App() {
   const [page, setPage] = useState<Page>("home");
-  const [cart, setCart] = useState<CartItem[]>([]);
+  const [cart, setCart] = useState<CartItem[]>(() => {
+    try {
+      const raw = localStorage.getItem("cart_v1");
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch (e) {
+      console.warn("cart load failed", e);
+    }
+    return [];
+  });
   const [products, setProducts] = useState<Product[]>(INITIAL_PRODUCTS);
   const productsLoaded = useRef(false);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("cart_v1", JSON.stringify(cart));
+    } catch (e) {
+      console.warn("cart save failed", e);
+    }
+  }, [cart]);
 
   useEffect(() => {
     if (productsLoaded.current) return;

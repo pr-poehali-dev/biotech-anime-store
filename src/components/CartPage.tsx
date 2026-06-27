@@ -185,14 +185,12 @@ export default function CartPage({ cart, removeFromCart, updateQty, setPage, cle
         <h2 className="text-3xl font-black mb-2" style={{ fontFamily: "Montserrat, sans-serif" }}>Не получилось оплатить</h2>
         <p className="text-muted-foreground mb-6">Платёж не прошёл. Попробуйте ещё раз или выберите другой способ оплаты.</p>
         <div className="flex flex-col sm:flex-row gap-3 justify-center">
-          {cart.length > 0 && (
-            <button
-              onClick={() => setFailed(false)}
-              className="bear-btn bg-primary text-primary-foreground font-bold px-8 py-3 rounded-2xl"
-            >
-              Попробовать снова
-            </button>
-          )}
+          <button
+            onClick={() => { setFailed(false); if (cart.length === 0) setPage("catalog"); }}
+            className="bear-btn bg-primary text-primary-foreground font-bold px-8 py-3 rounded-2xl"
+          >
+            Попробовать снова
+          </button>
           <button
             onClick={() => { setFailed(false); setPage("catalog"); }}
             className="border border-border font-semibold px-8 py-3 rounded-2xl hover:bg-secondary transition-colors"

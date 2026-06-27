@@ -43,10 +43,21 @@ def get_keys():
 
 
 def generate_token(params: dict, secret_key: str) -> str:
-    """Генерация подписи для Т-Банк API."""
-    filtered = {k: v for k, v in params.items() if k not in ("Token", "Receipt", "DATA", "Items")}
+    """Генерация подписи для Т-Банк API (только скалярные корневые поля)."""
+    filtered = {}
+    for k, v in params.items():
+        if k in ("Token", "Receipt", "DATA", "Items"):
+            continue
+        if v is None:
+            continue
+        if isinstance(v, (dict, list)):
+            continue
+        if isinstance(v, bool):
+            filtered[k] = "true" if v else "false"
+        else:
+            filtered[k] = str(v)
     filtered["Password"] = secret_key
-    sorted_values = "".join(str(v) for k, v in sorted(filtered.items()))
+    sorted_values = "".join(filtered[k] for k in sorted(filtered.keys()))
     return hashlib.sha256(sorted_values.encode()).hexdigest()
 
 
@@ -119,7 +130,6 @@ def handler(event: dict, context) -> dict:
         "Amount": amount_kopecks,
         "OrderId": str(order_id),
         "Description": description,
-        "RedirectDueDate": None,
     }
 
     if success_url:
@@ -130,12 +140,19 @@ def handler(event: dict, context) -> dict:
     payload["Token"] = generate_token(payload, secret_key)
 
     if receipt_items:
-        payload["Receipt"] = {
-            "Email": body.get("email", ""),
-            "Phone": body.get("phone", ""),
+        receipt = {
             "Taxation": "usn_income",
             "Items": receipt_items,
         }
+        email = body.get("email", "")
+        phone = body.get("phone", "")
+        if email:
+            receipt["Email"] = email
+        if phone:
+            receipt["Phone"] = phone
+        if not email and not phone:
+            receipt["Email"] = "noreply@example.com"
+        payload["Receipt"] = receipt
 
     try:
         resp = requests.post(TBANK_API_URL, json=payload, timeout=15)
@@ -148,11 +165,16 @@ def handler(event: dict, context) -> dict:
             "body": json.dumps({"error": f"Ошибка связи с Т-Банк: {str(e)}"}),
         }
 
+    print("TBANK_RESPONSE:", json.dumps(data, ensure_ascii=False))
+
     if not data.get("Success"):
+        err = data.get("Message", "Ошибка создания платежа")
+        details = data.get("Details", "")
+        msg = f"{err} {details}".strip()
         return {
             "statusCode": 400,
             "headers": cors_headers,
-            "body": json.dumps({"error": data.get("Message", "Ошибка создания платежа"), "details": data}),
+            "body": json.dumps({"error": msg, "code": data.get("ErrorCode"), "details": data}, ensure_ascii=False),
         }
 
     return {

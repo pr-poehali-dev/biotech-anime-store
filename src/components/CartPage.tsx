@@ -398,8 +398,14 @@ export default function CartPage({ cart, removeFromCart, updateQty, setPage, cle
                 Перейти к оплате СБП
               </a>
             )}
+            <button
+              onClick={() => markPaid(total)}
+              className="bear-btn block w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 rounded-2xl mb-3"
+            >
+              Я оплатил
+            </button>
             <p className="text-xs text-muted-foreground">
-              После оплаты сохраните чек. Заказ будет обработан вручную.
+              После оплаты нажмите «Я оплатил» — корзина очистится. Сохраните чек.
             </p>
           </div>
         </div>

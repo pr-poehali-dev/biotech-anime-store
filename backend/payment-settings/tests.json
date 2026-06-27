@@ -1,0 +1,21 @@
+{
+  "tests": [
+    {
+      "name": "GET статус эквайринга",
+      "method": "GET",
+      "path": "/",
+      "expectedStatus": 200,
+      "expectedBody": {"configured": "boolean", "isTest": "boolean", "enabled": "boolean"},
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "POST без пароля запрещён",
+      "method": "POST",
+      "path": "/",
+      "body": {"terminalKey": "test"},
+      "expectedStatus": 403,
+      "expectedBody": {"error": "string"},
+      "bodyMatcher": "partial"
+    }
+  ]
+}

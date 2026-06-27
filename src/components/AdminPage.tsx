@@ -28,7 +28,9 @@ const EMPTY: Omit<Product, "id"> = {
 
 const CATEGORIES = ["Биотехнологии", "Нутрицевтика", "Детокс", "Компьютеры", "Одежда и обувь", "Услуги", "Ветеранам"];
 
-type Tab = "site" | "texts" | "menu" | "contacts" | "products" | "engineers" | "tasks";
+type Tab = "site" | "texts" | "menu" | "contacts" | "products" | "payment" | "engineers" | "tasks";
+
+const PAYMENT_URL = (func2url as Record<string, string>)["payment-settings"];
 
 export default function AdminPage({ products, setProducts }: Props) {
   const [password, setPassword] = useState("");
@@ -73,6 +75,7 @@ export default function AdminPage({ products, setProducts }: Props) {
     { id: "menu", label: "Меню", icon: "Menu" },
     { id: "contacts", label: "Контакты", icon: "Phone" },
     { id: "products", label: "Товары", icon: "Package" },
+    { id: "payment", label: "Оплата", icon: "CreditCard" },
     { id: "engineers", label: "Инженеры", icon: "HardHat" },
     { id: "tasks", label: "Задачи", icon: "ClipboardList" },
   ];
@@ -118,6 +121,7 @@ export default function AdminPage({ products, setProducts }: Props) {
       {tab === "menu" && <MenuTab menu={settings.menu} setMenu={setMenu} />}
       {tab === "contacts" && <ContactsTab contacts={settings.contacts} setContacts={setContacts} />}
       {tab === "products" && <ProductsTab products={products} setProducts={setProducts} />}
+      {tab === "payment" && <PaymentTab />}
       {tab === "engineers" && <EngineersTab />}
       {tab === "tasks" && <TasksTab />}
     </div>
@@ -134,6 +138,150 @@ function SiteTab({ settings, updateSettings }: { settings: SiteSettings; updateS
       <div className="bg-green-50 border border-green-200 rounded-xl p-3 text-xs text-green-900">
         ✓ Изменения сохраняются в облаке и видны всем посетителям сайта.
       </div>
+    </div>
+  );
+}
+
+type PaymentStatus = {
+  configured: boolean;
+  terminalKeyMasked: string;
+  secretKeySet: boolean;
+  isTest: boolean;
+  enabled: boolean;
+};
+
+function PaymentTab() {
+  const [status, setStatus] = useState<PaymentStatus | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [terminalKey, setTerminalKey] = useState("");
+  const [secretKey, setSecretKey] = useState("");
+  const [isTest, setIsTest] = useState(true);
+  const [enabled, setEnabled] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(PAYMENT_URL);
+      if (res.ok) {
+        const data: PaymentStatus = await res.json();
+        setStatus(data);
+        setIsTest(data.isTest);
+        setEnabled(data.enabled);
+      }
+    } catch (e) {
+      console.warn("payment load failed", e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const save = async () => {
+    setSaving(true);
+    setSaved(false);
+    const payload: Record<string, unknown> = { isTest, enabled };
+    if (terminalKey.trim()) payload.terminalKey = terminalKey.trim();
+    if (secretKey.trim()) payload.secretKey = secretKey.trim();
+    try {
+      const res = await fetch(PAYMENT_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Admin-Password": ADMIN_PASSWORD },
+        body: JSON.stringify(payload),
+      });
+      if (res.ok) {
+        setTerminalKey("");
+        setSecretKey("");
+        setSaved(true);
+        await load();
+      } else {
+        alert("Не удалось сохранить ключи");
+      }
+    } catch (e) {
+      console.warn("payment save failed", e);
+      alert("Ошибка сети при сохранении");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return <div className="bg-white rounded-2xl border border-border p-6 text-sm text-muted-foreground">Загрузка…</div>;
+  }
+
+  return (
+    <div className="bg-white rounded-2xl border border-border p-6 space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="font-black text-lg">Эквайринг Т-Банка</h2>
+        {status?.configured ? (
+          <span className="flex items-center gap-1.5 text-xs font-bold bg-green-100 text-green-700 px-3 py-1 rounded-full">
+            <Icon name="CheckCircle2" fallback="Check" size={14} /> Подключено
+          </span>
+        ) : (
+          <span className="flex items-center gap-1.5 text-xs font-bold bg-amber-100 text-amber-700 px-3 py-1 rounded-full">
+            <Icon name="AlertCircle" fallback="Circle" size={14} /> Не настроено
+          </span>
+        )}
+      </div>
+
+      <div>
+        <label className="text-xs font-semibold text-muted-foreground mb-1 block">
+          Terminal Key (идентификатор терминала)
+        </label>
+        <input
+          className="w-full border border-border rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30"
+          value={terminalKey}
+          placeholder={status?.terminalKeyMasked || "Введите Terminal Key"}
+          onChange={(e) => setTerminalKey(e.target.value)}
+        />
+        {status?.terminalKeyMasked && (
+          <p className="text-[11px] text-muted-foreground mt-1">Текущий: {status.terminalKeyMasked}</p>
+        )}
+      </div>
+
+      <div>
+        <label className="text-xs font-semibold text-muted-foreground mb-1 block">
+          Secret Key / Password (секретный ключ)
+        </label>
+        <input
+          type="password"
+          autoComplete="new-password"
+          className="w-full border border-border rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30"
+          value={secretKey}
+          placeholder={status?.secretKeySet ? "•••• (сохранён, оставьте пустым, чтобы не менять)" : "Введите Secret Key"}
+          onChange={(e) => setSecretKey(e.target.value)}
+        />
+      </div>
+
+      <label className="flex items-center gap-3 border border-border rounded-xl px-3 py-2.5 cursor-pointer">
+        <input type="checkbox" className="w-4 h-4 accent-primary" checked={isTest} onChange={(e) => setIsTest(e.target.checked)} />
+        <div>
+          <div className="text-sm font-semibold">Тестовый режим</div>
+          <div className="text-xs text-muted-foreground">Платежи не списываются по-настоящему. Снимите для приёма реальных оплат.</div>
+        </div>
+      </label>
+
+      <label className="flex items-center gap-3 border border-border rounded-xl px-3 py-2.5 cursor-pointer">
+        <input type="checkbox" className="w-4 h-4 accent-primary" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
+        <div>
+          <div className="text-sm font-semibold">Приём оплаты включён</div>
+          <div className="text-xs text-muted-foreground">Включает оплату картой на сайте.</div>
+        </div>
+      </label>
+
+      <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-xs text-blue-900">
+        🔒 Ключи хранятся в защищённом хранилище сервера и никогда не отображаются на сайте. Получить их в Т-Банке: Личный кабинет → Магазины → реквизиты терминала.
+      </div>
+
+      <button
+        onClick={save}
+        disabled={saving}
+        className="bear-btn w-full bg-primary text-primary-foreground font-bold py-2.5 rounded-xl disabled:opacity-60"
+      >
+        {saving ? "Сохранение…" : saved ? "Сохранено ✓" : "Сохранить настройки оплаты"}
+      </button>
     </div>
   );
 }

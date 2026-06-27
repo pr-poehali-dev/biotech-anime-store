@@ -13,9 +13,19 @@ type Props = {
 
 export default function CartPage({ cart, removeFromCart, updateQty, setPage }: Props) {
   const [loading, setLoading] = useState(false);
+  const [sbpLoading, setSbpLoading] = useState(false);
   const [error, setError] = useState("");
+  const [qrPayload, setQrPayload] = useState("");
   const total = cart.reduce((s, i) => s + i.price * i.qty, 0);
   const hasVet = cart.some((i) => i.isVeteran);
+
+  const buildCart = () =>
+    cart.map((i) => ({
+      name: i.name,
+      price: i.price,
+      qty: i.qty,
+      isVeteran: i.isVeteran ?? false,
+    }));
 
   const handleTBankPay = async () => {
     setLoading(true);
@@ -26,13 +36,9 @@ export default function CartPage({ cart, removeFromCart, updateQty, setPage }: P
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          cart: cart.map((i) => ({
-            name: i.name,
-            price: i.price,
-            qty: i.qty,
-            isVeteran: i.isVeteran ?? false,
-          })),
+          cart: buildCart(),
           orderId,
+          method: "card",
           successUrl: window.location.href + "?payment=success",
           failUrl: window.location.href + "?payment=fail",
         }),
@@ -53,6 +59,41 @@ export default function CartPage({ cart, removeFromCart, updateQty, setPage }: P
       setLoading(false);
     }
   };
+
+  const handleSbpPay = async () => {
+    setSbpLoading(true);
+    setError("");
+    try {
+      const orderId = `order-${Date.now()}`;
+      const res = await fetch(PAYMENT_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          cart: buildCart(),
+          orderId,
+          method: "sbp",
+        }),
+      });
+      const data = await res.json();
+      if (data.free) {
+        alert("🎖️ " + data.message);
+        return;
+      }
+      if (data.qrPayload) {
+        setQrPayload(data.qrPayload);
+      } else {
+        setError(data.error || "Ошибка при создании QR-кода СБП");
+      }
+    } catch {
+      setError("Не удалось подключиться к платёжному сервису");
+    } finally {
+      setSbpLoading(false);
+    }
+  };
+
+  const qrImageUrl = qrPayload
+    ? `https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(qrPayload)}`
+    : "";
 
   if (cart.length === 0) {
     return (
@@ -158,6 +199,24 @@ export default function CartPage({ cart, removeFromCart, updateQty, setPage }: P
               )}
             </button>
 
+            <button
+              onClick={handleSbpPay}
+              disabled={sbpLoading}
+              className="bear-btn w-full bg-[#1D1346] hover:bg-[#2a1d63] disabled:opacity-60 disabled:cursor-not-allowed text-white font-black py-3 rounded-2xl flex items-center justify-center gap-2 mb-3 text-base"
+            >
+              {sbpLoading ? (
+                <>
+                  <Icon name="Loader2" size={20} className="animate-spin" />
+                  Готовим QR-код...
+                </>
+              ) : (
+                <>
+                  <Icon name="QrCode" size={20} />
+                  Оплатить по СБП (QR)
+                </>
+              )}
+            </button>
+
             {error && (
               <div className="bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl px-3 py-2 mb-3">
                 {error}
@@ -165,7 +224,7 @@ export default function CartPage({ cart, removeFromCart, updateQty, setPage }: P
             )}
 
             <p className="text-xs text-muted-foreground text-center">
-              Безопасная оплата через Т-Банк (Тинькофф). SSL-шифрование.
+              Оплата картой или по СБП через Т-Банк. SSL-шифрование.
             </p>
 
             <button
@@ -177,6 +236,47 @@ export default function CartPage({ cart, removeFromCart, updateQty, setPage }: P
           </div>
         </div>
       </div>
+
+      {qrPayload && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 animate-fade-in"
+          onClick={() => setQrPayload("")}
+        >
+          <div
+            className="bg-white rounded-3xl p-6 w-full max-w-sm text-center relative"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setQrPayload("")}
+              className="absolute top-4 right-4 w-8 h-8 rounded-full hover:bg-secondary flex items-center justify-center"
+            >
+              <Icon name="X" size={18} />
+            </button>
+            <div className="text-3xl mb-2">📱</div>
+            <h3 className="font-black text-lg mb-1" style={{ fontFamily: "Montserrat, sans-serif" }}>
+              Оплата по СБП
+            </h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              Отсканируйте QR-код камерой телефона или приложением банка
+            </p>
+            <div className="bg-white border border-border rounded-2xl p-3 inline-block mb-4">
+              <img src={qrImageUrl} alt="QR-код для оплаты по СБП" className="w-[260px] h-[260px]" />
+            </div>
+            <div className="font-black text-xl text-primary mb-3">{total.toLocaleString("ru")} ₽</div>
+            <a
+              href={qrPayload}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="bear-btn block w-full bg-primary text-primary-foreground font-bold py-3 rounded-2xl mb-2"
+            >
+              Открыть в приложении банка
+            </a>
+            <p className="text-xs text-muted-foreground">
+              После оплаты заказ будет принят автоматически
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

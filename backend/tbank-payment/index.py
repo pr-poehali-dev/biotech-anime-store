@@ -10,6 +10,7 @@ import psycopg2
 
 
 TBANK_API_URL = "https://securepay.tinkoff.ru/v2/Init"
+TBANK_QR_URL = "https://securepay.tinkoff.ru/v2/GetQr"
 SCHEMA = 't_p83915249_biotech_anime_store'
 
 
@@ -81,6 +82,7 @@ def handler(event: dict, context) -> dict:
     order_id = body.get("orderId", "order-1")
     success_url = body.get("successUrl", "")
     fail_url = body.get("failUrl", "")
+    pay_method = body.get("method", "card")
 
     if not cart:
         return {"statusCode": 400, "headers": cors_headers, "body": json.dumps({"error": "Корзина пуста"})}
@@ -177,13 +179,58 @@ def handler(event: dict, context) -> dict:
             "body": json.dumps({"error": msg, "code": data.get("ErrorCode"), "details": data}, ensure_ascii=False),
         }
 
+    payment_id = data.get("PaymentId")
+
+    if pay_method == "sbp":
+        qr_payload = {
+            "TerminalKey": terminal_key,
+            "PaymentId": str(payment_id),
+            "DataType": "PAYLOAD",
+        }
+        qr_payload["Token"] = generate_token(qr_payload, secret_key)
+        try:
+            qr_resp = requests.post(TBANK_QR_URL, json=qr_payload, timeout=15)
+            qr_resp.raise_for_status()
+            qr_data = qr_resp.json()
+        except requests.RequestException as e:
+            return {
+                "statusCode": 502,
+                "headers": cors_headers,
+                "body": json.dumps({"error": f"Ошибка получения QR: {str(e)}"}),
+            }
+
+        print("TBANK_QR_RESPONSE:", json.dumps(qr_data, ensure_ascii=False))
+
+        if not qr_data.get("Success"):
+            err = qr_data.get("Message", "Ошибка получения QR-кода СБП")
+            details = qr_data.get("Details", "")
+            return {
+                "statusCode": 400,
+                "headers": cors_headers,
+                "body": json.dumps({"error": f"{err} {details}".strip(), "code": qr_data.get("ErrorCode")}, ensure_ascii=False),
+            }
+
+        return {
+            "statusCode": 200,
+            "headers": cors_headers,
+            "body": json.dumps({
+                "success": True,
+                "method": "sbp",
+                "qrPayload": qr_data.get("Data"),
+                "paymentId": payment_id,
+                "orderId": order_id,
+                "amount": amount_rub,
+            }, ensure_ascii=False),
+        }
+
     return {
         "statusCode": 200,
         "headers": cors_headers,
         "body": json.dumps({
             "success": True,
+            "method": "card",
             "paymentUrl": data.get("PaymentURL"),
-            "paymentId": data.get("PaymentId"),
+            "paymentId": payment_id,
             "orderId": order_id,
             "amount": amount_rub,
         }),

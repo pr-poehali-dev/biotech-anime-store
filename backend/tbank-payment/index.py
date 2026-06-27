@@ -6,9 +6,40 @@ import json
 import os
 import hashlib
 import requests
+import psycopg2
 
 
 TBANK_API_URL = "https://securepay.tinkoff.ru/v2/Init"
+SCHEMA = 't_p83915249_biotech_anime_store'
+
+
+def get_keys():
+    """Берёт ключи из таблицы payment_settings, fallback на секреты окружения."""
+    terminal_key = ""
+    secret_key = ""
+    enabled = True
+    try:
+        conn = psycopg2.connect(os.environ['DATABASE_URL'])
+        cur = conn.cursor()
+        try:
+            cur.execute(
+                f"SELECT terminal_key, secret_key, enabled FROM {SCHEMA}.payment_settings WHERE provider = 'tbank'"
+            )
+            row = cur.fetchone()
+            if row:
+                terminal_key = row[0] or ""
+                secret_key = row[1] or ""
+                enabled = bool(row[2])
+        finally:
+            cur.close()
+            conn.close()
+    except Exception:
+        pass
+    if not terminal_key:
+        terminal_key = os.environ.get("TBANK_TERMINAL_KEY", "")
+    if not secret_key:
+        secret_key = os.environ.get("TBANK_SECRET_KEY", "")
+    return terminal_key, secret_key, enabled
 
 
 def generate_token(params: dict, secret_key: str) -> str:
@@ -53,14 +84,20 @@ def handler(event: dict, context) -> dict:
             "body": json.dumps({"success": True, "free": True, "message": "Товары для ветеранов СВО предоставляются бесплатно. Заявка принята."}),
         }
 
-    terminal_key = os.environ.get("TBANK_TERMINAL_KEY", "")
-    secret_key = os.environ.get("TBANK_SECRET_KEY", "")
+    terminal_key, secret_key, enabled = get_keys()
+
+    if not enabled:
+        return {
+            "statusCode": 400,
+            "headers": cors_headers,
+            "body": json.dumps({"error": "Приём оплаты временно отключён. Обратитесь к продавцу."}),
+        }
 
     if not terminal_key or not secret_key:
         return {
             "statusCode": 500,
             "headers": cors_headers,
-            "body": json.dumps({"error": "Платёжные ключи не настроены. Добавьте TBANK_TERMINAL_KEY и TBANK_SECRET_KEY в секреты."}),
+            "body": json.dumps({"error": "Платёжные ключи не настроены. Заполните их в админ-панели на вкладке «Оплата»."}),
         }
 
     description = f"Заказ #{order_id} — Маркет Товаров и Биотехнологий"

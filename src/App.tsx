@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { SiteSettingsProvider } from "@/contexts/SiteSettingsContext";
@@ -12,6 +12,10 @@ import DeliveryPage from "@/components/DeliveryPage";
 import ContactsPage from "@/components/ContactsPage";
 import ServicesPage from "@/components/ServicesPage";
 import TasksPage from "@/components/TasksPage";
+import func2url from "../backend/func2url.json";
+
+const PRODUCTS_URL = (func2url as Record<string, string>)["settings"] + "?type=products";
+const ADMIN_PASSWORD = "567765";
 
 export type Page = "home" | "catalog" | "veterans" | "cart" | "admin" | "delivery" | "contacts" | "services" | "tasks";
 
@@ -244,31 +248,51 @@ const INITIAL_PRODUCTS: Product[] = [
   },
 ];
 
-const PRODUCTS_KEY = "products_v1";
-
 export default function App() {
   const [page, setPage] = useState<Page>("home");
   const [cart, setCart] = useState<CartItem[]>([]);
-  const [products, setProducts] = useState<Product[]>(() => {
-    try {
-      const raw = localStorage.getItem(PRODUCTS_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+  const [products, setProducts] = useState<Product[]>(INITIAL_PRODUCTS);
+  const productsLoaded = useRef(false);
+
+  useEffect(() => {
+    if (productsLoaded.current) return;
+    productsLoaded.current = true;
+    (async () => {
+      try {
+        const res = await fetch(PRODUCTS_URL);
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data) && data.length > 0) {
+            setProducts(data);
+            return;
+          }
+          if (Array.isArray(data) && data.length === 0) {
+            await fetch(PRODUCTS_URL, {
+              method: "POST",
+              headers: { "Content-Type": "application/json", "X-Admin-Password": ADMIN_PASSWORD },
+              body: JSON.stringify(INITIAL_PRODUCTS),
+            });
+          }
+        }
+      } catch (e) {
+        console.warn("products load failed", e);
       }
-    } catch (e) {
-      console.warn("products load failed", e);
-    }
-    return INITIAL_PRODUCTS;
-  });
+    })();
+  }, []);
 
   const saveProducts = (next: Product[]) => {
     setProducts(next);
-    try {
-      localStorage.setItem(PRODUCTS_KEY, JSON.stringify(next));
-    } catch (e) {
-      console.warn("products save failed", e);
-    }
+    (async () => {
+      try {
+        await fetch(PRODUCTS_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-Admin-Password": ADMIN_PASSWORD },
+          body: JSON.stringify(next),
+        });
+      } catch (e) {
+        console.warn("products save failed", e);
+      }
+    })();
   };
 
   const addToCart = (product: Product) => {

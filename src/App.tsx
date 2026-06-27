@@ -244,12 +244,36 @@ const INITIAL_PRODUCTS: Product[] = [
   },
 ];
 
+const PRODUCTS_KEY = "products_v1";
+
 export default function App() {
   const [page, setPage] = useState<Page>("home");
   const [cart, setCart] = useState<CartItem[]>([]);
-  const [products, setProducts] = useState<Product[]>(INITIAL_PRODUCTS);
+  const [products, setProducts] = useState<Product[]>(() => {
+    try {
+      const raw = localStorage.getItem(PRODUCTS_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {
+      console.warn("products load failed", e);
+    }
+    return INITIAL_PRODUCTS;
+  });
+
+  const saveProducts = (next: Product[]) => {
+    setProducts(next);
+    try {
+      localStorage.setItem(PRODUCTS_KEY, JSON.stringify(next));
+    } catch (e) {
+      console.warn("products save failed", e);
+    }
+  };
 
   const addToCart = (product: Product) => {
+    const fresh = products.find((p) => p.id === product.id) || product;
+    if (fresh.outOfStock) return;
     setCart((prev) => {
       const existing = prev.find((i) => i.id === product.id);
       if (existing) return prev.map((i) => i.id === product.id ? { ...i, qty: i.qty + 1 } : i);
@@ -274,7 +298,7 @@ export default function App() {
       case "catalog": return <CatalogPage products={products} addToCart={addToCart} />;
       case "veterans": return <VeteransPage products={products} addToCart={addToCart} />;
       case "cart": return <CartPage cart={cart} removeFromCart={removeFromCart} updateQty={updateQty} setPage={setPage} />;
-      case "admin": return <AdminPage products={products} setProducts={setProducts} />;
+      case "admin": return <AdminPage products={products} setProducts={saveProducts} />;
       case "delivery": return <DeliveryPage />;
       case "contacts": return <ContactsPage />;
       case "services": return <ServicesPage setPage={setPage} />;

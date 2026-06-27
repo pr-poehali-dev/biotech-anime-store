@@ -28,7 +28,7 @@ const EMPTY: Omit<Product, "id"> = {
 
 const CATEGORIES = ["Биотехнологии", "Нутрицевтика", "Детокс", "Компьютеры", "Одежда и обувь", "Услуги", "Ветеранам"];
 
-type Tab = "site" | "texts" | "menu" | "contacts" | "products" | "payment" | "engineers" | "tasks";
+type Tab = "site" | "texts" | "menu" | "contacts" | "products" | "payment" | "orders" | "engineers" | "tasks";
 
 const PAYMENT_URL = (func2url as Record<string, string>)["payment-settings"];
 const TBANK_URL = (func2url as Record<string, string>)["tbank-payment"];
@@ -77,6 +77,7 @@ export default function AdminPage({ products, setProducts }: Props) {
     { id: "contacts", label: "Контакты", icon: "Phone" },
     { id: "products", label: "Товары", icon: "Package" },
     { id: "payment", label: "Оплата", icon: "CreditCard" },
+    { id: "orders", label: "Заказы", icon: "Receipt" },
     { id: "engineers", label: "Инженеры", icon: "HardHat" },
     { id: "tasks", label: "Задачи", icon: "ClipboardList" },
   ];
@@ -123,6 +124,7 @@ export default function AdminPage({ products, setProducts }: Props) {
       {tab === "contacts" && <ContactsTab contacts={settings.contacts} setContacts={setContacts} />}
       {tab === "products" && <ProductsTab products={products} setProducts={setProducts} />}
       {tab === "payment" && <PaymentTab />}
+      {tab === "orders" && <OrdersTab />}
       {tab === "engineers" && <EngineersTab />}
       {tab === "tasks" && <TasksTab />}
     </div>
@@ -365,6 +367,130 @@ function RefundBlock() {
       >
         {loading ? "Оформляем возврат…" : "Оформить возврат средств"}
       </button>
+    </div>
+  );
+}
+
+type Order = {
+  orderId: string;
+  paymentId: string;
+  amount: number;
+  method: string;
+  status: string;
+  items: { name: string; price: number; qty: number; isVeteran?: boolean }[];
+  createdAt: string;
+};
+
+const STATUS_LABELS: Record<string, { text: string; cls: string }> = {
+  NEW: { text: "Ожидает оплаты", cls: "bg-amber-100 text-amber-700" },
+  CONFIRMED: { text: "Оплачен", cls: "bg-green-100 text-green-700" },
+  AUTHORIZED: { text: "Оплачен", cls: "bg-green-100 text-green-700" },
+  REFUNDED: { text: "Возвращён", cls: "bg-gray-200 text-gray-700" },
+  PARTIAL_REFUNDED: { text: "Частичный возврат", cls: "bg-gray-200 text-gray-700" },
+  REJECTED: { text: "Отклонён", cls: "bg-red-100 text-red-700" },
+  CANCELED: { text: "Отменён", cls: "bg-red-100 text-red-700" },
+  DEADLINE_EXPIRED: { text: "Истёк срок", cls: "bg-red-100 text-red-700" },
+};
+
+function OrdersTab() {
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [busyId, setBusyId] = useState("");
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(TBANK_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Admin-Password": ADMIN_PASSWORD },
+        body: JSON.stringify({ action: "orders" }),
+      });
+      const data = await res.json();
+      if (data.success) setOrders(data.orders || []);
+    } catch (e) {
+      console.warn("orders load failed", e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const refund = async (o: Order) => {
+    if (!confirm(`Оформить возврат ${o.amount.toLocaleString("ru")} ₽ покупателю? Деньги вернутся на счёт, с которого была оплата.`)) return;
+    setBusyId(o.paymentId);
+    try {
+      const res = await fetch(TBANK_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Admin-Password": ADMIN_PASSWORD },
+        body: JSON.stringify({ action: "refund", paymentId: o.paymentId }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert("✓ " + (data.message || "Возврат оформлен"));
+        await load();
+      } else {
+        alert("⚠ " + (data.error || "Не удалось оформить возврат"));
+      }
+    } catch {
+      alert("⚠ Ошибка сети при возврате");
+    } finally {
+      setBusyId("");
+    }
+  };
+
+  if (loading) {
+    return <div className="bg-white rounded-2xl border border-border p-6 text-sm text-muted-foreground">Загрузка заказов…</div>;
+  }
+
+  return (
+    <div className="bg-white rounded-2xl border border-border p-6 space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="font-black text-lg">Журнал заказов</h2>
+        <button onClick={load} className="text-sm font-semibold flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-border hover:bg-secondary transition-colors">
+          <Icon name="RefreshCw" size={14} /> Обновить
+        </button>
+      </div>
+
+      {orders.length === 0 && (
+        <div className="text-sm text-muted-foreground py-8 text-center">Пока нет ни одного заказа.</div>
+      )}
+
+      <div className="space-y-3">
+        {orders.map((o) => {
+          const st = STATUS_LABELS[o.status] || { text: o.status, cls: "bg-gray-100 text-gray-600" };
+          const isPaid = o.status === "CONFIRMED" || o.status === "AUTHORIZED";
+          const dt = o.createdAt ? new Date(o.createdAt) : null;
+          return (
+            <div key={o.paymentId || o.orderId} className="border border-border rounded-2xl p-4">
+              <div className="flex items-start justify-between gap-3 flex-wrap">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-black">{o.amount.toLocaleString("ru")} ₽</span>
+                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${st.cls}`}>{st.text}</span>
+                    <span className="text-xs text-muted-foreground">{o.method === "sbp" ? "СБП" : "Карта"}</span>
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-1">
+                    Платёж №{o.paymentId} {dt && `· ${dt.toLocaleString("ru")}`}
+                  </div>
+                  <div className="text-xs text-foreground mt-1 truncate max-w-md">
+                    {o.items.map((i) => `${i.name}×${i.qty}`).join(", ")}
+                  </div>
+                </div>
+                {isPaid && (
+                  <button
+                    onClick={() => refund(o)}
+                    disabled={busyId === o.paymentId}
+                    className="bear-btn bg-red-500 hover:bg-red-600 text-white text-sm font-bold px-4 py-2 rounded-xl disabled:opacity-60 whitespace-nowrap"
+                  >
+                    {busyId === o.paymentId ? "Возврат…" : "Вернуть деньги"}
+                  </button>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

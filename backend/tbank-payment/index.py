@@ -65,6 +65,45 @@ def generate_token(params: dict, secret_key: str) -> str:
     return hashlib.sha256(sorted_values.encode()).hexdigest()
 
 
+def save_order(order_id, payment_id, amount, pay_method, items):
+    """Сохраняет заказ в журнал."""
+    try:
+        conn = psycopg2.connect(os.environ['DATABASE_URL'])
+        cur = conn.cursor()
+        try:
+            items_json = json.dumps(items, ensure_ascii=False).replace("'", "''")
+            oid = str(order_id).replace("'", "''")
+            pid = str(payment_id).replace("'", "''")
+            pm = str(pay_method).replace("'", "''")
+            cur.execute(
+                f"INSERT INTO {SCHEMA}.orders (order_id, payment_id, amount, pay_method, status, items) "
+                f"VALUES ('{oid}', '{pid}', {float(amount)}, '{pm}', 'NEW', '{items_json}'::jsonb)"
+            )
+            conn.commit()
+        finally:
+            cur.close()
+            conn.close()
+    except Exception as e:
+        print("SAVE_ORDER_ERROR:", str(e))
+
+
+def update_order_status(payment_id, status):
+    """Обновляет статус заказа по payment_id."""
+    try:
+        conn = psycopg2.connect(os.environ['DATABASE_URL'])
+        cur = conn.cursor()
+        try:
+            pid = str(payment_id).replace("'", "''")
+            st = str(status).replace("'", "''")
+            cur.execute(f"UPDATE {SCHEMA}.orders SET status = '{st}' WHERE payment_id = '{pid}'")
+            conn.commit()
+        finally:
+            cur.close()
+            conn.close()
+    except Exception as e:
+        print("UPDATE_ORDER_ERROR:", str(e))
+
+
 def handler(event: dict, context) -> dict:
     """Создаёт платёж в Т-Банк и возвращает URL для оплаты."""
     cors_headers = {
@@ -81,6 +120,35 @@ def handler(event: dict, context) -> dict:
     except Exception:
         return {"statusCode": 400, "headers": cors_headers, "body": json.dumps({"error": "Invalid JSON"})}
 
+    if body.get("action") == "orders":
+        headers = event.get("headers") or {}
+        pwd = headers.get("X-Admin-Password") or headers.get("x-admin-password") or ""
+        if pwd != ADMIN_PASSWORD:
+            return {"statusCode": 403, "headers": cors_headers, "body": json.dumps({"error": "Нет доступа"}, ensure_ascii=False)}
+        conn = psycopg2.connect(os.environ['DATABASE_URL'])
+        cur = conn.cursor()
+        try:
+            cur.execute(
+                f"SELECT order_id, payment_id, amount, pay_method, status, items, created_at "
+                f"FROM {SCHEMA}.orders ORDER BY created_at DESC LIMIT 200"
+            )
+            rows = cur.fetchall()
+            orders = []
+            for r in rows:
+                orders.append({
+                    "orderId": r[0],
+                    "paymentId": r[1],
+                    "amount": float(r[2]),
+                    "method": r[3],
+                    "status": r[4],
+                    "items": r[5],
+                    "createdAt": r[6].isoformat() if r[6] else "",
+                })
+            return {"statusCode": 200, "headers": cors_headers, "body": json.dumps({"success": True, "orders": orders}, ensure_ascii=False)}
+        finally:
+            cur.close()
+            conn.close()
+
     if body.get("action") == "status":
         payment_id = body.get("paymentId")
         if not payment_id:
@@ -96,6 +164,8 @@ def handler(event: dict, context) -> dict:
             return {"statusCode": 502, "headers": cors_headers, "body": json.dumps({"error": f"Ошибка проверки статуса: {str(e)}"})}
         status = st_data.get("Status", "")
         paid = status in ("CONFIRMED", "AUTHORIZED")
+        if status:
+            update_order_status(payment_id, status)
         return {
             "statusCode": 200,
             "headers": cors_headers,
@@ -129,6 +199,7 @@ def handler(event: dict, context) -> dict:
             err = c_data.get("Message", "Не удалось оформить возврат")
             details = c_data.get("Details", "")
             return {"statusCode": 400, "headers": cors_headers, "body": json.dumps({"error": f"{err} {details}".strip(), "code": c_data.get("ErrorCode")}, ensure_ascii=False)}
+        update_order_status(payment_id, c_data.get("Status", "REFUNDED") or "REFUNDED")
         return {
             "statusCode": 200,
             "headers": cors_headers,
@@ -242,6 +313,11 @@ def handler(event: dict, context) -> dict:
         }
 
     payment_id = data.get("PaymentId")
+
+    save_order(order_id, payment_id, amount_rub, pay_method, [
+        {"name": i.get("name", ""), "price": i.get("price", 0), "qty": i.get("qty", 1), "isVeteran": i.get("isVeteran", False)}
+        for i in cart
+    ])
 
     if pay_method == "sbp":
         qr_payload = {

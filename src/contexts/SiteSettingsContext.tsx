@@ -38,10 +38,27 @@ export type SiteSettings = {
   texts: PageTexts;
   sbpLink: string;
   sbpQrImage: string;
-  categories: string[];
+  categories: Category[];
 };
 
-export const DEFAULT_CATEGORIES = ["Биотехнологии", "Нутрицевтика", "Детокс", "Компьютеры", "Одежда и обувь", "Услуги", "Ветеранам"];
+export type Category = { name: string; icon: string };
+
+export const DEFAULT_CATEGORIES: Category[] = [
+  { name: "Биотехнологии", icon: "🧬" },
+  { name: "Нутрицевтика", icon: "💊" },
+  { name: "Детокс", icon: "🌿" },
+  { name: "Компьютеры", icon: "💻" },
+  { name: "Одежда и обувь", icon: "👟" },
+  { name: "Услуги", icon: "🔧" },
+  { name: "Ветеранам", icon: "🎖️" },
+];
+
+export function normalizeCategories(raw: unknown): Category[] {
+  if (!Array.isArray(raw) || raw.length === 0) return DEFAULT_CATEGORIES;
+  return raw.map((c) =>
+    typeof c === "string" ? { name: c, icon: "🐻" } : { name: c.name || "", icon: c.icon || "🐻" }
+  ).filter((c) => c.name);
+}
 
 const DEFAULT_SETTINGS: SiteSettings = {
   siteName: "Товары · Услуги · Ветеранам",
@@ -94,7 +111,7 @@ type Ctx = {
   updateTexts: (patch: Partial<PageTexts>, adminPassword: string) => Promise<void>;
   setMenu: (menu: MenuItem[], adminPassword: string) => Promise<void>;
   setContacts: (contacts: ContactItem[], adminPassword: string) => Promise<void>;
-  setCategories: (categories: string[], adminPassword: string) => Promise<void>;
+  setCategories: (categories: Category[], adminPassword: string) => Promise<void>;
   resetToDefault: (adminPassword: string) => Promise<void>;
 };
 
@@ -107,7 +124,7 @@ function mergeWithDefaults(parsed: Partial<SiteSettings>): SiteSettings {
     menu: parsed.menu && parsed.menu.length > 0 ? parsed.menu : DEFAULT_SETTINGS.menu,
     contacts: parsed.contacts && parsed.contacts.length > 0 ? parsed.contacts : DEFAULT_SETTINGS.contacts,
     texts: { ...DEFAULT_SETTINGS.texts, ...(parsed.texts || {}) },
-    categories: parsed.categories && parsed.categories.length > 0 ? parsed.categories : DEFAULT_SETTINGS.categories,
+    categories: normalizeCategories(parsed.categories),
   };
 }
 
@@ -165,7 +182,7 @@ export function SiteSettingsProvider({ children }: { children: ReactNode }) {
     await save({ ...settings, contacts }, adminPassword);
   };
 
-  const setCategories = async (categories: string[], adminPassword: string) => {
+  const setCategories = async (categories: Category[], adminPassword: string) => {
     await save({ ...settings, categories }, adminPassword);
   };
 

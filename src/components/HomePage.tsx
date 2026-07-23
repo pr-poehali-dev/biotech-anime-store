@@ -9,16 +9,7 @@ type Props = {
   addToCart: (p: Product) => void;
 };
 
-const CATEGORY_ICONS: Record<string, string> = {
-  "Биотехнологии": "🧬",
-  "Нутрицевтика": "💊",
-  "Детокс": "🌿",
-  "Компьютеры": "💻",
-  "Одежда и обувь": "👟",
-  "Услуги": "🔧",
-  "Ветеранам": "🎖️",
-  "Кухонные ножи": "🔪",
-};
+
 
 const BEAR_URL = "https://cdn.poehali.dev/projects/bdc6b0f1-9d51-4bfd-8a1e-7d2779701ef2/files/06d573e8-89dd-4724-ab0e-a053e7d5790b.jpg";
 const VET_BEAR_URL = "https://cdn.poehali.dev/projects/bdc6b0f1-9d51-4bfd-8a1e-7d2779701ef2/files/6d6aa334-77cf-4882-8c40-3c4eea7b5ccd.jpg";
@@ -81,18 +72,18 @@ export default function HomePage({ setPage, products, addToCart }: Props) {
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-3">
             {settings.categories.map((cat) => (
               <button
-                key={cat}
-                onClick={() => cat === "Ветеранам" ? setPage("veterans") : cat === "Услуги" ? setPage("services") : setPage("catalog")}
+                key={cat.name}
+                onClick={() => cat.name === "Ветеранам" ? setPage("veterans") : cat.name === "Услуги" ? setPage("services") : setPage("catalog")}
                 className={`bear-btn flex flex-col items-center justify-center gap-2 p-5 rounded-2xl border-2 font-semibold text-sm transition-all ${
-                  cat === "Ветеранам"
+                  cat.name === "Ветеранам"
                     ? "border-red-300 bg-red-50 text-red-700 hover:bg-red-100"
-                    : cat === "Услуги"
+                    : cat.name === "Услуги"
                     ? "border-orange-300 bg-orange-50 text-orange-700 hover:bg-orange-100"
                     : "border-border bg-background hover:border-primary hover:bg-blue-50 text-foreground"
                 }`}
               >
-                <span className="text-3xl">{CATEGORY_ICONS[cat] || "🐻"}</span>
-                <span>{cat}</span>
+                <span className="text-3xl">{cat.icon || "🐻"}</span>
+                <span>{cat.name}</span>
               </button>
             ))}
           </div>

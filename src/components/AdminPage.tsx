@@ -26,8 +26,6 @@ const EMPTY: Omit<Product, "id"> = {
   outOfStock: false,
 };
 
-const CATEGORIES = ["Биотехнологии", "Нутрицевтика", "Детокс", "Компьютеры", "Одежда и обувь", "Услуги", "Ветеранам"];
-
 type Tab = "site" | "texts" | "menu" | "contacts" | "products" | "payment" | "orders" | "engineers" | "tasks";
 
 const PAYMENT_URL = (func2url as Record<string, string>)["payment-settings"];
@@ -773,26 +771,32 @@ function ContactsTab({ contacts, setContacts }: { contacts: ContactItem[]; setCo
 
 function ProductsTab({ products, setProducts }: Props) {
   const { settings, setCategories } = useSiteSettings();
-  const categories = settings.categories && settings.categories.length > 0 ? settings.categories : CATEGORIES;
+  const categories = settings.categories;
+  const catNames = categories.map((c) => c.name);
   const [editing, setEditing] = useState<Product | null>(null);
   const [form, setForm] = useState<Omit<Product, "id">>(EMPTY);
   const [showForm, setShowForm] = useState(false);
   const [newCat, setNewCat] = useState("");
+  const [newIcon, setNewIcon] = useState("🐻");
 
   const addCategory = () => {
     const name = newCat.trim();
     if (!name) return;
-    if (categories.includes(name)) { setNewCat(""); return; }
-    setCategories([...categories, name], ADMIN_PASSWORD);
+    if (catNames.includes(name)) { setNewCat(""); return; }
+    setCategories([...categories, { name, icon: newIcon.trim() || "🐻" }], ADMIN_PASSWORD);
     setNewCat("");
+    setNewIcon("🐻");
+  };
+  const setIcon = (name: string, icon: string) => {
+    setCategories(categories.map((c) => c.name === name ? { ...c, icon } : c), ADMIN_PASSWORD);
   };
   const removeCategory = (name: string) => {
     const count = products.filter((p) => p.category === name).length;
     if (count > 0 && !confirm(`В категории «${name}» есть товары (${count}). Удалить категорию? Товары останутся, но категория пропадёт из списка.`)) return;
-    setCategories(categories.filter((c) => c !== name), ADMIN_PASSWORD);
+    setCategories(categories.filter((c) => c.name !== name), ADMIN_PASSWORD);
   };
 
-  const openNew = () => { setEditing(null); setForm({ ...EMPTY, category: categories[0] || "" }); setShowForm(true); };
+  const openNew = () => { setEditing(null); setForm({ ...EMPTY, category: catNames[0] || "" }); setShowForm(true); };
   const openEdit = (p: Product) => { setEditing(p); setForm({ name: p.name, price: p.price, oldPrice: p.oldPrice, image: p.image, category: p.category, isVeteran: p.isVeteran, description: p.description, badge: p.badge, outOfStock: p.outOfStock }); setShowForm(true); };
 
   const saveProduct = () => {
@@ -813,16 +817,31 @@ function ProductsTab({ products, setProducts }: Props) {
         <p className="text-xs text-muted-foreground mb-4">Категории отображаются в каталоге и на главной. Добавьте новую — например «Кухонные ножи».</p>
         <div className="flex flex-wrap gap-2 mb-3">
           {categories.map((c) => (
-            <span key={c} className="inline-flex items-center gap-1.5 bg-slate-100 border border-border rounded-full pl-3 pr-1.5 py-1 text-sm font-semibold">
-              {c}
-              <button onClick={() => removeCategory(c)} className="w-5 h-5 rounded-full hover:bg-red-100 text-red-500 flex items-center justify-center" title="Удалить">
+            <span key={c.name} className="inline-flex items-center gap-1 bg-slate-100 border border-border rounded-full pl-1.5 pr-1.5 py-1 text-sm font-semibold">
+              <input
+                value={c.icon}
+                onChange={(e) => setIcon(c.name, e.target.value.slice(0, 4))}
+                className="w-8 text-center text-lg bg-white border border-border rounded-full py-0.5 outline-none focus:ring-2 focus:ring-primary/30"
+                title="Иконка (эмодзи)"
+                maxLength={4}
+              />
+              {c.name}
+              <button onClick={() => removeCategory(c.name)} className="w-5 h-5 rounded-full hover:bg-red-100 text-red-500 flex items-center justify-center" title="Удалить">
                 <Icon name="X" size={13} />
               </button>
             </span>
           ))}
           {categories.length === 0 && <span className="text-sm text-muted-foreground">Пока нет категорий</span>}
         </div>
+        <p className="text-[11px] text-muted-foreground mb-2">Нажмите на иконку слева от названия, чтобы поставить свой эмодзи (например 🔪 🥑 🎁).</p>
         <div className="flex gap-2">
+          <input
+            value={newIcon}
+            onChange={(e) => setNewIcon(e.target.value.slice(0, 4))}
+            className="w-14 text-center text-lg border border-border rounded-xl px-2 py-2 outline-none focus:ring-2 focus:ring-primary/30"
+            title="Иконка новой категории"
+            maxLength={4}
+          />
           <input
             value={newCat}
             onChange={(e) => setNewCat(e.target.value)}
@@ -861,8 +880,8 @@ function ProductsTab({ products, setProducts }: Props) {
               <div>
                 <label className="text-xs font-semibold text-muted-foreground mb-1 block">Категория</label>
                 <select className="w-full border border-border rounded-xl px-3 py-2 text-sm bg-white" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value, isVeteran: e.target.value === "Ветеранам" })}>
-                  {categories.map((c) => <option key={c}>{c}</option>)}
-                  {form.category && !categories.includes(form.category) && <option key={form.category}>{form.category}</option>}
+                  {catNames.map((c) => <option key={c}>{c}</option>)}
+                  {form.category && !catNames.includes(form.category) && <option key={form.category}>{form.category}</option>}
                 </select>
               </div>
               <Field label="URL изображения" value={form.image} onChange={(v) => setForm({ ...form, image: v })} />

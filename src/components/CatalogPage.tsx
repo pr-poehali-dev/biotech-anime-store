@@ -14,7 +14,7 @@ export default function CatalogPage({ products, addToCart }: Props) {
   const [activeCategory, setActiveCategory] = useState("Все");
 
   const nonVet = products.filter((p) => !p.isVeteran);
-  const fromSettings = settings.categories.filter((c) => c !== "Ветеранам");
+  const fromSettings = settings.categories.map((c) => c.name).filter((c) => c !== "Ветеранам");
   const fromProducts = Array.from(new Set(nonVet.map((p) => p.category)));
   const categories = ["Все", ...Array.from(new Set([...fromSettings, ...fromProducts]))];
 

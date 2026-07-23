@@ -772,11 +772,27 @@ function ContactsTab({ contacts, setContacts }: { contacts: ContactItem[]; setCo
 }
 
 function ProductsTab({ products, setProducts }: Props) {
+  const { settings, setCategories } = useSiteSettings();
+  const categories = settings.categories && settings.categories.length > 0 ? settings.categories : CATEGORIES;
   const [editing, setEditing] = useState<Product | null>(null);
   const [form, setForm] = useState<Omit<Product, "id">>(EMPTY);
   const [showForm, setShowForm] = useState(false);
+  const [newCat, setNewCat] = useState("");
 
-  const openNew = () => { setEditing(null); setForm(EMPTY); setShowForm(true); };
+  const addCategory = () => {
+    const name = newCat.trim();
+    if (!name) return;
+    if (categories.includes(name)) { setNewCat(""); return; }
+    setCategories([...categories, name], ADMIN_PASSWORD);
+    setNewCat("");
+  };
+  const removeCategory = (name: string) => {
+    const count = products.filter((p) => p.category === name).length;
+    if (count > 0 && !confirm(`В категории «${name}» есть товары (${count}). Удалить категорию? Товары останутся, но категория пропадёт из списка.`)) return;
+    setCategories(categories.filter((c) => c !== name), ADMIN_PASSWORD);
+  };
+
+  const openNew = () => { setEditing(null); setForm({ ...EMPTY, category: categories[0] || "" }); setShowForm(true); };
   const openEdit = (p: Product) => { setEditing(p); setForm({ name: p.name, price: p.price, oldPrice: p.oldPrice, image: p.image, category: p.category, isVeteran: p.isVeteran, description: p.description, badge: p.badge, outOfStock: p.outOfStock }); setShowForm(true); };
 
   const saveProduct = () => {
@@ -792,6 +808,34 @@ function ProductsTab({ products, setProducts }: Props) {
 
   return (
     <div>
+      <div className="bg-white rounded-2xl border border-border p-5 mb-4">
+        <h2 className="font-black text-lg mb-1">Категории товаров</h2>
+        <p className="text-xs text-muted-foreground mb-4">Категории отображаются в каталоге и на главной. Добавьте новую — например «Кухонные ножи».</p>
+        <div className="flex flex-wrap gap-2 mb-3">
+          {categories.map((c) => (
+            <span key={c} className="inline-flex items-center gap-1.5 bg-slate-100 border border-border rounded-full pl-3 pr-1.5 py-1 text-sm font-semibold">
+              {c}
+              <button onClick={() => removeCategory(c)} className="w-5 h-5 rounded-full hover:bg-red-100 text-red-500 flex items-center justify-center" title="Удалить">
+                <Icon name="X" size={13} />
+              </button>
+            </span>
+          ))}
+          {categories.length === 0 && <span className="text-sm text-muted-foreground">Пока нет категорий</span>}
+        </div>
+        <div className="flex gap-2">
+          <input
+            value={newCat}
+            onChange={(e) => setNewCat(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && addCategory()}
+            placeholder="Новая категория, напр. Кухонные ножи"
+            className="flex-1 border border-border rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30"
+          />
+          <button onClick={addCategory} className="bear-btn bg-primary text-primary-foreground font-bold px-4 py-2 rounded-xl flex items-center gap-1.5 whitespace-nowrap">
+            <Icon name="Plus" size={16} /> Добавить
+          </button>
+        </div>
+      </div>
+
       <div className="flex justify-end mb-4">
         <button onClick={openNew} className="bear-btn bg-primary text-primary-foreground font-bold px-4 py-2.5 rounded-xl flex items-center gap-2">
           <Icon name="Plus" size={18} /> Добавить товар
@@ -817,7 +861,8 @@ function ProductsTab({ products, setProducts }: Props) {
               <div>
                 <label className="text-xs font-semibold text-muted-foreground mb-1 block">Категория</label>
                 <select className="w-full border border-border rounded-xl px-3 py-2 text-sm bg-white" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value, isVeteran: e.target.value === "Ветеранам" })}>
-                  {CATEGORIES.map((c) => <option key={c}>{c}</option>)}
+                  {categories.map((c) => <option key={c}>{c}</option>)}
+                  {form.category && !categories.includes(form.category) && <option key={form.category}>{form.category}</option>}
                 </select>
               </div>
               <Field label="URL изображения" value={form.image} onChange={(v) => setForm({ ...form, image: v })} />

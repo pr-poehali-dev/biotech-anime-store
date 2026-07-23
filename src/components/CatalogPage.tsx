@@ -1,6 +1,7 @@
 import { useState } from "react";
 import ProductCard from "@/components/ProductCard";
 import type { Product } from "@/App";
+import { useSiteSettings } from "@/contexts/SiteSettingsContext";
 
 type Props = {
   products: Product[];
@@ -8,11 +9,14 @@ type Props = {
 };
 
 export default function CatalogPage({ products, addToCart }: Props) {
+  const { settings } = useSiteSettings();
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState("Все");
 
   const nonVet = products.filter((p) => !p.isVeteran);
-  const categories = ["Все", ...Array.from(new Set(nonVet.map((p) => p.category)))];
+  const fromSettings = settings.categories.filter((c) => c !== "Ветеранам");
+  const fromProducts = Array.from(new Set(nonVet.map((p) => p.category)));
+  const categories = ["Все", ...Array.from(new Set([...fromSettings, ...fromProducts]))];
 
   const filtered = nonVet.filter((p) => {
     const matchCat = activeCategory === "Все" || p.category === activeCategory;

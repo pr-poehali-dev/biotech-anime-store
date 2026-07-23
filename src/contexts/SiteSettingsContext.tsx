@@ -38,7 +38,10 @@ export type SiteSettings = {
   texts: PageTexts;
   sbpLink: string;
   sbpQrImage: string;
+  categories: string[];
 };
+
+export const DEFAULT_CATEGORIES = ["Биотехнологии", "Нутрицевтика", "Детокс", "Компьютеры", "Одежда и обувь", "Услуги", "Ветеранам"];
 
 const DEFAULT_SETTINGS: SiteSettings = {
   siteName: "Товары · Услуги · Ветеранам",
@@ -79,6 +82,7 @@ const DEFAULT_SETTINGS: SiteSettings = {
   },
   sbpLink: "",
   sbpQrImage: "",
+  categories: DEFAULT_CATEGORIES,
 };
 
 const SETTINGS_URL = (func2url as Record<string, string>)["settings"];
@@ -90,6 +94,7 @@ type Ctx = {
   updateTexts: (patch: Partial<PageTexts>, adminPassword: string) => Promise<void>;
   setMenu: (menu: MenuItem[], adminPassword: string) => Promise<void>;
   setContacts: (contacts: ContactItem[], adminPassword: string) => Promise<void>;
+  setCategories: (categories: string[], adminPassword: string) => Promise<void>;
   resetToDefault: (adminPassword: string) => Promise<void>;
 };
 
@@ -102,6 +107,7 @@ function mergeWithDefaults(parsed: Partial<SiteSettings>): SiteSettings {
     menu: parsed.menu && parsed.menu.length > 0 ? parsed.menu : DEFAULT_SETTINGS.menu,
     contacts: parsed.contacts && parsed.contacts.length > 0 ? parsed.contacts : DEFAULT_SETTINGS.contacts,
     texts: { ...DEFAULT_SETTINGS.texts, ...(parsed.texts || {}) },
+    categories: parsed.categories && parsed.categories.length > 0 ? parsed.categories : DEFAULT_SETTINGS.categories,
   };
 }
 
@@ -159,12 +165,16 @@ export function SiteSettingsProvider({ children }: { children: ReactNode }) {
     await save({ ...settings, contacts }, adminPassword);
   };
 
+  const setCategories = async (categories: string[], adminPassword: string) => {
+    await save({ ...settings, categories }, adminPassword);
+  };
+
   const resetToDefault = async (adminPassword: string) => {
     await save(DEFAULT_SETTINGS, adminPassword);
   };
 
   return (
-    <SiteSettingsContext.Provider value={{ settings, loading, updateSettings, updateTexts, setMenu, setContacts, resetToDefault }}>
+    <SiteSettingsContext.Provider value={{ settings, loading, updateSettings, updateTexts, setMenu, setContacts, setCategories, resetToDefault }}>
       {children}
     </SiteSettingsContext.Provider>
   );
